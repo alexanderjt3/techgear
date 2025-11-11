@@ -11,16 +11,103 @@ This comprehensive guide walks through building **TechGear**, an electronics sho
 ## Table of Contents
 
 1. [Prerequisites](#1-prerequisites)
+   - Required Software
+   - Verify Your Environment
+   - Knowledge Prerequisites
+
 2. [Understanding the Architecture](#2-understanding-the-architecture)
+   - What is MCP (Model Context Protocol)?
+   - How TechGear Works
+   - Key Components
+   - Why This Architecture?
+
 3. [Project Structure Setup](#3-project-structure-setup)
+   - Create the Project Directory
+   - Set Up Workspace Configuration
+   - Final Directory Structure
+
 4. [Creating the Headphones Widget Package](#4-creating-the-headphones-widget-package)
+   - Overview
+   - Step 1: Initialize the Widget Package
+   - Step 2: Configure TypeScript
+   - Step 3: Define Zod Schemas
+   - Step 4: Create Data and Filtering Logic
+   - Step 5: Create ChatGPT Integration Hook (CRITICAL)
+   - Step 6: Create React Component
+   - Step 7: Create Widget Types
+   - Step 8: Define Widget Configuration
+   - Step 9: Write AI-Facing Descriptions
+   - Step 10: Create MCP Registration Logic
+   - Step 11: Create Public Exports
+   - Step 12: Build the Widget Package
+
 5. [Building Helper Utilities](#5-building-helper-utilities)
+   - Overview
+   - Step 1: Define TypeScript Types
+   - Step 2: Create Metadata Helper Functions
+   - Step 3: Create Widget Loader
+
 6. [Building the MCP Server](#6-building-the-mcp-server)
-7. [Critical Configuration for Widget Rendering](#7-critical-configuration-for-widget-rendering)
-8. [Testing with MCPJam Inspector](#8-testing-with-mcpjam-inspector)
-9. [Troubleshooting Widget Rendering](#9-troubleshooting-widget-rendering)
-10. [Testing with ChatGPT](#10-testing-with-chatgpt)
-11. [Key Learnings and Best Practices](#11-key-learnings-and-best-practices)
+   - Overview
+   - Step 1: Initialize Next.js App
+   - Step 2: Install Dependencies
+   - Step 3: Configure Next.js (CRITICAL FOR WIDGET RENDERING)
+   - Step 4: Create MCP Widget Registry
+   - Step 5: Create MCP Endpoint
+   - Step 6: Create Widget Preview Page
+   - Step 7: Create Homepage
+   - Step 8: Start the Development Server
+
+7. [Testing with MCPJam Inspector](#7-testing-with-mcpjam-inspector)
+   - Overview
+   - Step 1: Set Up Playground Package
+   - Step 2: Create Inspector Configuration
+   - Step 3: Launch Inspector
+   - Step 4: Connect to Your Server
+   - Step 5: Test in Playground
+   - Step 6: Verify in Browser Console
+   - Step 7: Debug with Messages Tab
+   - Testing Summary
+
+8. [Critical Configuration and Troubleshooting](#8-critical-configuration-and-troubleshooting)
+   - Overview
+   - Critical Configuration 1: Asset Prefix
+   - Critical Configuration 2: Event-Driven Reactivity
+   - Critical Configuration 3: MIME Type
+   - Critical Configuration 4: Complete Metadata
+   - Critical Configuration 5: Simplified Response Format
+   - Troubleshooting Guide
+     - Problem 1: Widget Shows Blank Page
+     - Problem 2: Widget Shows Loading Forever
+     - Problem 3: Widget Shows JSON Instead of HTML
+     - Problem 4: Widget Shows But Data Doesn't Update
+     - Problem 5: Tool Not Being Called
+   - Configuration Checklist
+
+9. [Testing with ChatGPT](#9-testing-with-chatgpt)
+   - Overview
+   - Step 1: Expose Your Server
+   - Step 2: Enable Developer Mode
+   - Step 3: Add MCP Connector
+   - Step 4: Test in ChatGPT
+   - Step 5: Monitor Your Server
+
+10. [Key Learnings and Best Practices](#10-key-learnings-and-best-practices)
+    - Overview
+    - Architecture Lessons
+    - Critical Configurations
+    - Development Workflow
+    - Debugging Tips
+    - Common Mistakes to Avoid
+    - Scaling to Multiple Widgets
+
+11. [Conclusion](#conclusion)
+    - Core Concepts
+    - Technical Skills
+    - Best Practices
+    - Next Steps
+    - Resources
+    - Support
 
 ---
 
@@ -1618,40 +1705,41 @@ export const POST = handler;
 
 ### Step 6: Create Widget Preview Page
 
-**Purpose**: Build a standalone page that renders the widget with fallback data. This enables testing and styling the widget during development without needing to call the MCP tool through ChatGPT.
+**Purpose**: Build a standalone page that renders the widget. This enables testing and viewing the widget during development to verify it loads correctly.
+
+Create `packages/mcp/src/app/widgets/headphones/page.tsx`:
 
 ```typescript
-import { HeadphonesWidget } from "headphones-widget";
-import { HEADPHONES } from "headphones-widget/dist/data/headphones";
+"use client";
+
+import HeadphonesWidget from "headphones-widget/component";
 
 /**
- * Headphones Widget Preview Page
- * 
- * This page lets you view the widget standalone (without ChatGPT) during development.
- * It uses fallback data so you can test styling and functionality.
- * 
- * Visit: http://localhost:3000/widgets/headphones
+ * Headphones Widget Page
+ * Renders the headphones widget component
  */
 export default function HeadphonesWidgetPage() {
-    // Use all headphones as fallback data
-    const fallbackData = {
-        headphones: HEADPHONES,
-        summary: "Showing all 6 headphones (preview mode)",
-    };
-
-    return <HeadphonesWidget fallbackData={fallbackData} />;
+    return <HeadphonesWidget />;
 }
 ```
+
+**What this page does**:
+- **Direct rendering**: Imports and renders the widget component directly
+- **Client-side**: Uses `"use client"` directive for React client components
+- **Simple import**: Imports from `headphones-widget/component` export path
 
 **Benefits of preview pages**:
 - **Fast iteration**: Test widget changes without MCP protocol overhead
 - **Visual debugging**: See styling and layout issues immediately
 - **Component testing**: Verify React components render correctly
-- **Fallback data**: Test with various data scenarios by modifying fallback
 
 **Access**: Visit `http://localhost:3000/widgets/headphones` while dev server is running
 
+**Note**: The widget component handles its own data fetching from `window.openai.toolOutput` when running in ChatGPT, or can show a loading/empty state when accessed directly.
+
 ### Step 7: Create Homepage
+
+`packages/mcp/src/app/widgets/headphones/page.tsx`
 
 **Purpose**: Build an informative landing page that explains the MCP server, provides links to widget previews, and documents the available endpoints.
 
@@ -1661,53 +1749,7 @@ import Link from "next/link";
 export default function HomePage() {
     return (
         <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center p-8">
-            <div className="max-w-2xl w-full bg-white rounded-2xl shadow-xl p-8">
-                <h1 className="text-4xl font-bold text-gray-900 mb-4">
-                    TechGear MCP Server
-                </h1>
-                <p className="text-lg text-gray-600 mb-8">
-                    An educational MCP server for suggesting headphones in ChatGPT.
-                </p>
-
-                <div className="space-y-4">
-                    <div className="border-l-4 border-blue-500 bg-blue-50 p-4">
-                        <h2 className="font-semibold text-blue-900 mb-2">MCP Endpoint</h2>
-                        <code className="text-sm text-blue-700">POST /mcp</code>
-                        <p className="text-sm text-blue-600 mt-2">
-                            This is the endpoint ChatGPT calls to interact with widgets.
-                        </p>
-                    </div>
-
-                    <div className="border-l-4 border-green-500 bg-green-50 p-4">
-                        <h2 className="font-semibold text-green-900 mb-2">Widget Preview</h2>
-                        <Link
-                            href="/widgets/headphones"
-                            className="text-sm text-green-700 hover:underline"
-                        >
-                            View Headphones Widget →
-                        </Link>
-                        <p className="text-sm text-green-600 mt-2">
-                            See how the widget looks without ChatGPT.
-                        </p>
-                    </div>
-
-                    <div className="border-l-4 border-purple-500 bg-purple-50 p-4">
-                        <h2 className="font-semibold text-purple-900 mb-2">Testing</h2>
-                        <p className="text-sm text-purple-600">
-                            Use MCPJam Inspector to test the MCP endpoint locally before deploying.
-                        </p>
-                    </div>
-                </div>
-
-                <div className="mt-8 pt-8 border-t border-gray-200">
-                    <h3 className="font-semibold text-gray-900 mb-2">Documentation</h3>
-                    <ul className="text-sm text-gray-600 space-y-1">
-                        <li>• <a href="https://developers.openai.com/apps-sdk" className="hover:underline">OpenAI Apps SDK</a></li>
-                        <li>• <a href="https://spec.modelcontextprotocol.io/" className="hover:underline">MCP Specification</a></li>
-                        <li>• <a href="https://docs.mcpjam.com/" className="hover:underline">MCPJam Documentation</a></li>
-                    </ul>
-                </div>
-            </div>
+            {/* Default Home Page Content */}
         </div>
     );
 }
@@ -1751,206 +1793,11 @@ npm run dev
    - Look for: Widget loading messages in terminal
    - Expected: "Loading widgets from registry...", "Successfully registered widget..."
 
-**Next steps**: With the server running, you're ready to test with MCPJam Inspector (Section 8) or connect to ChatGPT (Section 10).
+**Next steps**: With the server running, you're ready to test with MCPJam Inspector (Section 7) or connect to ChatGPT (Section 9).
 
 ---
 
-## 7. Critical Configuration for Widget Rendering
-
-This section covers the critical configurations that make widgets render correctly in ChatGPT. These were discovered through troubleshooting and align with the reference implementation.
-
-### Overview
-
-Widgets require specific configurations to render correctly in ChatGPT's sandboxed iframe environment. This section explains the four critical configuration requirements that were discovered through development:
-
-1. **Asset Prefix Configuration**: Making JavaScript files load with absolute URLs
-2. **Event-Driven Reactivity**: Using React 18's `useSyncExternalStore` instead of polling
-3. **MIME Type Specification**: Using `text/html+skybridge` for widget templates
-4. **Complete Metadata**: Including `_meta` fields in resources, tools, and responses
-5. **Simplified Response Format**: Using `structuredContent` at root level (not in nested array)
-
-Each configuration is essential - missing any one will cause widgets to fail in different ways (blank page, frozen loading, JSON display, etc.).
-
-### Issue 1: JavaScript Assets Not Loading
-
-**Symptom**: Widget iframe loads but shows a blank white page. Browser console shows 404 errors for JavaScript files.
-
-**Problem:** When ChatGPT loads your widget HTML in an iframe, script tags with relative paths like `<script src="/_next/static/chunks/webpack.js">` fail because the browser resolves them relative to `chatgpt.com`, not your server.
-
-**Solution:** The `assetPrefix` in `next.config.ts` (already configured in Step 6.3)
-
-**How it works:**
-```typescript
-// Without assetPrefix:
-<script src="/_next/static/chunks/webpack.js"></script>
-// Browser tries: https://chatgpt.com/_next/static/chunks/webpack.js ❌
-
-// With assetPrefix:
-<script src="http://localhost:3000/_next/static/chunks/webpack.js"></script>
-// Browser tries: http://localhost:3000/_next/static/chunks/webpack.js ✅
-```
-
-### Issue 2: Data Not Updating Widget
-
-**Symptom**: Widget shows "Loading..." forever or displays fallback data instead of tool results. Console shows no errors.
-
-**Root cause**: Old implementations used `setInterval` polling to check for `window.openai.toolOutput`. This has timing issues - the component might check before ChatGPT injects the data, or React might not re-render even when the data changes.
-
-**Solution**: Event-driven reactivity with `useSyncExternalStore` (already implemented in Step 5.8)
-
-**How it works:**
-```typescript
-// OLD APPROACH (Don't use) ❌
-useEffect(() => {
-    const intervalId = setInterval(() => {
-        if (window.openai?.toolOutput) {
-            setProps(window.openai.toolOutput);
-        }
-    }, 1000);  // Check every second
-    return () => clearInterval(intervalId);
-}, []);
-
-// NEW APPROACH (Correct) ✅
-useSyncExternalStore(
-    (onChange) => {
-        // Subscribe to OpenAI's custom event
-        const handleSetGlobal = (event: CustomEvent) => {
-            if (event.detail?.globals?.toolOutput) {
-                onChange();  // Trigger immediate re-render
-            }
-        };
-        window.addEventListener("openai:set_globals", handleSetGlobal);
-        return () => window.removeEventListener("openai:set_globals", handleSetGlobal);
-    },
-    () => window.openai?.toolOutput ?? null,
-    () => null
-);
-```
-
-**Benefits:**
-- ✅ Immediate reactivity (no 1-second delay)
-- ✅ No CPU waste from polling
-- ✅ Follows React 18+ best practices
-- ✅ Matches OpenAI's official examples
-
-### Issue 3: MIME Type Must Be Correct
-
-**Symptom**: Widget doesn't render, or displays as plain text/JSON instead of HTML.
-
-**Root cause**: ChatGPT requires a specific MIME type (`text/html+skybridge`) to recognize HTML content as a widget template. Using standard `text/html` causes ChatGPT to treat it as regular content, not a widget.
-
-**Solution**: Always use `text/html+skybridge` in two places
-
-```typescript
-// WRONG ❌
-mimeType: "text/html"
-
-// CORRECT ✅
-mimeType: "text/html+skybridge"
-```
-
-This appears in two places in `register.ts`:
-1. Resource descriptor metadata
-2. Resource contents mimeType
-
-### Issue 4: Metadata Must Be Complete
-
-**Symptom**: Widget doesn't render, or tool doesn't trigger widget display. May see tool results as text only.
-
-**Root cause**: ChatGPT uses `_meta` fields to understand that a tool should display a widget and which widget template to use. Missing metadata breaks the connection between the tool and its widget.
-
-**Solution**: Always include complete metadata in three places:
-
-1. **Resource registration:**
-```typescript
-_meta: createResourceMeta(
-    headphonesWidgetPrompts.widgetDescription,
-    headphonesWidgetMetadata.prefersBorder
-)
-```
-
-2. **Tool registration:**
-```typescript
-_meta: createWidgetMeta(headphonesWidgetMetadata)
-```
-
-3. **Tool response:**
-```typescript
-return {
-    content: [{ type: "text", text: summary }],
-    structuredContent: result,
-    _meta: createWidgetMeta(headphonesWidgetMetadata),  // Links tool to widget
-};
-```
-
-### Issue 5: Response Format Must Be Simplified
-
-**Symptom**: Tool executes but widget doesn't receive data, or displays JSON as text.
-
-**Root cause**: Older MCP documentation showed a nested array format for widgets. The current implementation uses a simpler format with `structuredContent` at the root level.
-
-**DO NOT use deprecated format:**
-```typescript
-// DEPRECATED ❌
-return {
-    content: [
-        {
-            type: "text",
-            text: summary,
-            _meta: {
-                openai: {
-                    widgets: [  // This array format is deprecated
-                        {
-                            type: "widget",
-                            uri: "ui://headphones",
-                            structuredContent: result,
-                        },
-                    ],
-                },
-            },
-        },
-    ],
-};
-```
-
-**USE simplified format:**
-```typescript
-// CORRECT ✅
-return {
-    content: [{ type: "text", text: summary }],
-    structuredContent: result,  // At root level
-    _meta: createWidgetMeta(headphonesWidgetMetadata),
-};
-```
-
-**Why this works:**
-- The tool's `_meta["openai/outputTemplate"]` already links to the widget
-- ChatGPT knows which widget to render from the tool metadata
-- The `structuredContent` at root level is automatically injected into `window.openai.toolOutput`
-
-### Configuration Checklist
-
-Before testing your widget, verify all five critical configurations:
-
-- [ ] **Asset prefix** configured in `next.config.ts` (returns absolute URLs in development)
-- [ ] **Event-driven reactivity** using `useSyncExternalStore` in widget hook
-- [ ] **MIME type** is `text/html+skybridge` in both resource descriptor and contents
-- [ ] **Complete metadata** in resource registration, tool registration, and tool response
-- [ ] **Simplified response format** with `structuredContent` at root level (not in nested array)
-
-**Verification commands:**
-```bash
-# Check asset URLs are absolute
-curl -s http://localhost:3000/widgets/headphones | grep -o 'src="[^"]*"' | head -3
-
-# Should show:
-# src="http://localhost:3000/_next/static/..." (development)
-# NOT: src="/_next/static/..." (would fail in ChatGPT)
-```
-
----
-
-## 8. Testing with MCPJam Inspector
+## 7. Testing with MCPJam Inspector
 
 MCPJam Inspector is a local testing tool that simulates how ChatGPT interacts with your MCP server.
 
@@ -2222,89 +2069,270 @@ Once MCPJam Inspector successfully renders your widget:
 ✅ **UI working**: React component renders with correct styling  
 ✅ **Ready for ChatGPT**: Widget should work the same way in real ChatGPT  
 
-**Next steps**: Deploy your MCP server (Vercel, ngrok, etc.) and connect it to ChatGPT (Section 10).
+**Next steps**: Deploy your MCP server (Vercel, ngrok, etc.) and connect it to ChatGPT (Section 9).
 
 ---
 
-## 9. Troubleshooting Widget Rendering
+
+## 8. Critical Configuration and Troubleshooting
+
+This section covers the essential configurations for widget rendering and provides solutions to common issues.
 
 ### Overview
 
-This section provides solutions to common widget rendering issues. Each problem includes:
-- **Symptoms**: What you'll see when this issue occurs
-- **Diagnosis**: How to identify the root cause
-- **Solution**: Step-by-step fix instructions
-- **Verification**: How to confirm the issue is resolved
+Widgets require specific configurations to render correctly in ChatGPT's sandboxed iframe environment. Missing any of these configurations will cause widgets to fail in different ways (blank page, frozen loading, JSON display, etc.).
 
-**Common problems**:
-1. Widget shows blank page (asset loading failure)
-2. Widget shows "Loading..." forever (data not updating)
-3. Widget shows JSON instead of HTML (MIME type issue)
-4. Widget shows but data doesn't update (missing metadata)
-5. Tool not being called (unclear tool description)
+**Critical requirements**:
+1. **Asset Prefix Configuration**: Making JavaScript files load with absolute URLs
+2. **Event-Driven Reactivity**: Using React 18's `useSyncExternalStore` instead of polling
+3. **MIME Type Specification**: Using `text/html+skybridge` for widget templates
+4. **Complete Metadata**: Including `_meta` fields in resources, tools, and responses
+5. **Simplified Response Format**: Using `structuredContent` at root level (not in nested array)
 
-**General debugging approach**:
+**Troubleshooting approach**:
 1. Check browser console for errors
 2. Verify MCP server logs for registration issues
 3. Test widget preview page first (`/widgets/headphones`)
 4. Use MCPJam Messages tab to inspect protocol communication
-5. Verify all five critical configurations (Section 7)
+5. Verify all five critical configurations using the checklist below
 
-### Problem 1: Widget Shows Blank Page
+---
+
+### Critical Configuration 1: Asset Prefix
+
+**Why it's required**: When ChatGPT loads your widget HTML in an iframe, script tags with relative paths like `<script src="/_next/static/chunks/webpack.js">` fail because the browser resolves them relative to `chatgpt.com`, not your server.
+
+**Configuration** (already in `next.config.ts`):
+```typescript
+function getAssetPrefix(): string {
+    if (process.env.NODE_ENV === "development") {
+        const port = process.env.PORT || 3000;
+        return `http://localhost:${port}`;  // Absolute URLs in development
+    }
+    return "";  // Relative paths in production
+}
+
+const nextConfig: NextConfig = {
+    assetPrefix: getAssetPrefix(),  // CRITICAL
+    // ...
+};
+```
+
+**How it works:**
+```typescript
+// Without assetPrefix (fails in ChatGPT):
+<script src="/_next/static/chunks/webpack.js"></script>
+// Browser resolves: https://chatgpt.com/_next/static/chunks/webpack.js ❌
+
+// With assetPrefix (works in ChatGPT):
+<script src="http://localhost:3000/_next/static/chunks/webpack.js"></script>
+// Browser resolves: http://localhost:3000/_next/static/chunks/webpack.js ✅
+```
+
+---
+
+### Critical Configuration 2: Event-Driven Reactivity
+
+**Why it's required**: Old implementations used `setInterval` polling to check for `window.openai.toolOutput`. This has timing issues - the component might check before ChatGPT injects the data, or React might not re-render even when the data changes.
+
+**Configuration** (already in `useOpenAI.ts`):
+```typescript
+// CORRECT ✅ - Event-driven approach
+useSyncExternalStore(
+    (onChange) => {
+        const handleSetGlobal = (event: CustomEvent) => {
+            if (event.detail?.globals?.toolOutput) {
+                onChange();  // Trigger immediate re-render
+            }
+        };
+        window.addEventListener("openai:set_globals", handleSetGlobal);
+        return () => window.removeEventListener("openai:set_globals", handleSetGlobal);
+    },
+    () => window.openai?.toolOutput ?? null,
+    () => null
+);
+
+// WRONG ❌ - Polling approach (don't use)
+useEffect(() => {
+    const intervalId = setInterval(() => {
+        if (window.openai?.toolOutput) {
+            setProps(window.openai.toolOutput);
+        }
+    }, 1000);
+    return () => clearInterval(intervalId);
+}, []);
+```
+
+**Benefits:**
+- ✅ Immediate reactivity (no delay)
+- ✅ No CPU waste from polling
+- ✅ Follows React 18+ best practices
+- ✅ Matches OpenAI's official examples
+
+---
+
+### Critical Configuration 3: MIME Type
+
+**Why it's required**: ChatGPT requires the specific MIME type `text/html+skybridge` to recognize HTML content as a widget template. Using standard `text/html` causes ChatGPT to treat it as regular content, not a widget.
+
+**Configuration** (in `register.ts`):
+```typescript
+// CORRECT ✅
+server.registerResource(
+    "headphones-widget",
+    headphonesWidgetMetadata.templateUri,
+    {
+        mimeType: "text/html+skybridge",  // Must include +skybridge
+        // ...
+    },
+    async (uri: URL) => ({
+        contents: [
+            {
+                mimeType: "text/html+skybridge",  // Must match above
+                text: `<html>${html}</html>`,
+                // ...
+            },
+        ],
+    })
+);
+
+// WRONG ❌
+mimeType: "text/html"  // Missing +skybridge suffix
+```
+
+---
+
+### Critical Configuration 4: Complete Metadata
+
+**Why it's required**: ChatGPT uses `_meta` fields to understand that a tool should display a widget and which widget template to use. Missing metadata breaks the connection between the tool and its widget.
+
+**Configuration** (in `register.ts`, three places):
+
+1. **Resource registration:**
+```typescript
+_meta: createResourceMeta(
+    headphonesWidgetPrompts.widgetDescription,
+    headphonesWidgetMetadata.prefersBorder
+)
+```
+
+2. **Tool registration:**
+```typescript
+_meta: createWidgetMeta(headphonesWidgetMetadata)
+```
+
+3. **Tool response:**
+```typescript
+return {
+    content: [{ type: "text", text: summary }],
+    structuredContent: result,
+    _meta: createWidgetMeta(headphonesWidgetMetadata),  // Links tool to widget
+};
+```
+
+---
+
+### Critical Configuration 5: Simplified Response Format
+
+**Why it's required**: Older MCP documentation showed a nested array format. The current implementation uses a simpler format with `structuredContent` at the root level.
+
+**Configuration** (in `register.ts`):
+```typescript
+// CORRECT ✅
+return {
+    content: [{ type: "text", text: summary }],
+    structuredContent: result,  // At root level
+    _meta: createWidgetMeta(headphonesWidgetMetadata),
+};
+
+// DEPRECATED ❌ (don't use)
+return {
+    content: [
+        {
+            type: "text",
+            text: summary,
+            _meta: {
+                openai: {
+                    widgets: [  // Nested array format is deprecated
+                        {
+                            type: "widget",
+                            uri: "ui://headphones",
+                            structuredContent: result,
+                        },
+                    ],
+                },
+            },
+        },
+    ],
+};
+```
+
+**Why this works:**
+- The tool's `_meta["openai/outputTemplate"]` already links to the widget
+- ChatGPT knows which widget to render from the tool metadata
+- The `structuredContent` at root level is automatically injected into `window.openai.toolOutput`
+
+---
+
+### Troubleshooting Guide
+
+#### Problem 1: Widget Shows Blank Page
 
 **Symptoms:**
 - Widget iframe loads but shows nothing
 - Console error: `Uncaught SyntaxError: Unexpected token '<'`
 - Network tab shows 404 for `/_next/static/chunks/...`
 
-**Diagnosis:** Script paths are relative, failing in ChatGPT iframe
+**Diagnosis:** Asset prefix configuration missing or incorrect
 
-**Solution:** Verify `assetPrefix` in `next.config.ts`
+**Solution:**
 
+1. Verify `assetPrefix` in `next.config.ts`:
 ```bash
 # Check if asset URLs are absolute
-curl -s http://localhost:3000/widgets/headphones | grep -o 'src="[^"]*"' | head -5
+curl -s http://localhost:3000/widgets/headphones | grep -o 'src="[^"]*"' | head -3
 ```
 
-**Expected:**
+2. **Expected output:**
 ```
 src="http://localhost:3000/_next/static/chunks/webpack.js"
 src="http://localhost:3000/_next/static/chunks/main.js"
 ```
 
-**If you see relative paths:**
-```
-src="/_next/static/chunks/webpack.js"  ❌
+3. **If you see relative paths**, restart the server:
+```bash
+# Ctrl+C to stop server, then:
+npm run dev
 ```
 
-**Fix:** Restart the MCP server after verifying `next.config.ts` has `assetPrefix: getAssetPrefix()`.
+---
 
-### Problem 2: Widget Shows Loading Forever
+#### Problem 2: Widget Shows Loading Forever
 
 **Symptoms:**
 - Widget loads but shows "Loading headphones..." forever
 - No console logs from `useWidgetProps`
+- `window.openai.toolOutput` is undefined or not updating
 
-**Diagnosis:** Data not reaching the widget
+**Diagnosis:** Data not reaching the widget (reactivity issue)
 
-**Solution Steps:**
+**Solution:**
 
-1. **Check browser console for errors**
-2. **Verify window.openai exists:**
+1. **Check browser console:**
 ```javascript
 // In browser console:
 window.openai
 // Should show: {toolOutput: {...}, maxHeight: number}
 ```
 
-3. **Check if useSyncExternalStore is being used:**
+2. **Verify event-driven implementation:**
 ```bash
 # In widget package:
 grep -n "useSyncExternalStore" src/hooks/useOpenAI.ts
 ```
-Should show the event-driven implementation from Step 5.8
+Should show the `useSyncExternalStore` implementation, not polling
 
-4. **Rebuild widget if necessary:**
+3. **Rebuild widget if necessary:**
 ```bash
 cd packages/widgets/headphones-widget
 npm run build
@@ -2312,32 +2340,47 @@ cd ../../mcp
 # Restart server: Ctrl+C then npm run dev
 ```
 
-### Problem 3: Widget Shows JSON Instead of HTML
+---
+
+#### Problem 3: Widget Shows JSON Instead of HTML
 
 **Symptoms:**
 - Widget area shows raw JSON text
 - No HTML is rendered
+- Console may show MIME type warnings
 
-**Diagnosis:** MIME type is wrong
+**Diagnosis:** MIME type missing `+skybridge` suffix
 
-**Solution:** Check `register.ts`
+**Solution:**
 
+Check `register.ts` for correct MIME type:
 ```typescript
 // Both places must have +skybridge:
 mimeType: "text/html+skybridge"  // ✅ Correct
 ```
 
-### Problem 4: Widget Shows But Data Doesn't Update
+After fixing, rebuild and restart:
+```bash
+cd packages/widgets/headphones-widget
+npm run build
+cd ../../mcp
+npm run dev
+```
+
+---
+
+#### Problem 4: Widget Shows But Data Doesn't Update
 
 **Symptoms:**
-- Widget renders with fallback data
+- Widget renders with fallback/default data
 - Doesn't update when tool is called
-- Console shows: `[Carousel] Using fallback data`
+- May see correct data in network tab but not in widget
 
-**Diagnosis:** Tool response not including proper metadata
+**Diagnosis:** Tool response missing metadata or using wrong format
 
-**Solution:** Verify tool response in `register.ts`:
+**Solution:**
 
+Verify tool response structure in `register.ts`:
 ```typescript
 return {
     content: [{ type: "text", text: summary }],
@@ -2346,16 +2389,20 @@ return {
 };
 ```
 
-### Problem 5: Tool Not Being Called
+---
+
+#### Problem 5: Tool Not Being Called
 
 **Symptoms:**
-- You ask about headphones but tool isn't called
+- You ask about headphones but tool isn't invoked
 - ChatGPT responds in text only
+- No widget appears
 
-**Diagnosis:** Tool description isn't clear enough
+**Diagnosis:** Tool description isn't clear or lacks examples
 
-**Solution:** Update `prompts.ts` with better examples:
+**Solution:**
 
+Update `prompts.ts` with explicit examples:
 ```typescript
 toolDescription: `Find and filter headphones based on price, activity, and style.
 
@@ -2367,14 +2414,43 @@ Examples:
 - "I need over-ear headphones for commuting"
 - "What headphones do you have for the gym?"
 
-...`
+Filters:
+- priceBracket: budget ($50-100), midrange ($100-200), premium ($200+), or all
+- activity: commuting, gaming, studio, fitness, or all
+- style: in-ear, on-ear, over-ear, or all`
 ```
 
-Be explicit about when to use the tool and provide diverse examples.
+Be explicit about when to use the tool and provide diverse example queries.
 
 ---
 
-## 10. Testing with ChatGPT
+### Configuration Checklist
+
+Before testing your widget, verify all five critical configurations:
+
+- [ ] **Asset prefix** configured in `next.config.ts` (returns absolute URLs in development)
+- [ ] **Event-driven reactivity** using `useSyncExternalStore` in widget hook
+- [ ] **MIME type** is `text/html+skybridge` in both resource descriptor and contents
+- [ ] **Complete metadata** in resource registration, tool registration, and tool response
+- [ ] **Simplified response format** with `structuredContent` at root level (not in nested array)
+
+**Quick verification:**
+```bash
+# Verify absolute URLs
+curl -s http://localhost:3000/widgets/headphones | grep -o 'src="[^"]*"' | head -3
+# Should show: src="http://localhost:3000/_next/static/..." ✅
+# NOT: src="/_next/static/..." ❌
+
+# Verify event-driven implementation
+grep -n "useSyncExternalStore" packages/widgets/headphones-widget/src/hooks/useOpenAI.ts
+
+# Verify MIME type
+grep -n "text/html+skybridge" packages/widgets/headphones-widget/src/register.ts
+```
+
+---
+
+## 9. Testing with ChatGPT
 
 Once everything works in MCPJam Inspector, test with real ChatGPT.
 
@@ -2496,7 +2572,7 @@ When ChatGPT calls your tool, you'll see HTTP POST requests in the logs.
 
 ---
 
-## 11. Key Learnings and Best Practices
+## 10. Key Learnings and Best Practices
 
 ### Overview
 
