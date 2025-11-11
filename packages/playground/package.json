@@ -1,0 +1,11 @@
+{
+    "name": "techgear-playground",
+    "version": "0.0.1",
+    "private": true,
+    "description": "Testing playground for TechGear MCP server",
+    "license": "MIT",
+    "scripts": {
+        "inspector": "npx @mcpjam/inspector@latest"
+    }
+}
+

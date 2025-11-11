@@ -1,0 +1,40 @@
+{
+    "name": "headphones-widget",
+    "version": "0.0.1",
+    "private": true,
+    "description": "Headphones widget for TechGear MCP server",
+    "keywords": ["mcp", "widget", "headphones", "techgear"],
+    "license": "MIT",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        },
+        "./component": {
+            "types": "./dist/components/HeadphonesWidget.d.ts",
+            "import": "./dist/components/HeadphonesWidget.js"
+        }
+    },
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "scripts": {
+        "build": "tsc",
+        "clean": "rm -rf node_modules dist",
+        "dev": "tsc --watch"
+    },
+    "dependencies": {
+        "@modelcontextprotocol/sdk": "^1.20.0",
+        "zod": "^3.25.0"
+    },
+    "devDependencies": {
+        "@types/react": "^19",
+        "next": "15.5.5",
+        "react": "^19.2.0",
+        "typescript": "^5"
+    },
+    "peerDependencies": {
+        "next": "15.5.5",
+        "react": "^19.2.0"
+    }
+}
+

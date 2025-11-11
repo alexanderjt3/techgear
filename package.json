@@ -1,0 +1,20 @@
+{
+    "name": "techgear",
+    "version": "0.1.0",
+    "private": true,
+    "description": "TechGear - Headphones shopping assistant with OpenAI Apps SDK and MCP",
+    "keywords": ["mcp", "openai", "apps-sdk", "chatgpt", "headphones"],
+    "license": "MIT",
+    "workspaces": [
+        "packages/*",
+        "packages/widgets/*"
+    ],
+    "scripts": {
+        "dev": "npm run dev --workspace=packages/mcp",
+        "build:widget": "npm run build --workspace=packages/widgets/headphones-widget",
+        "build:mcp": "npm run build --workspace=packages/mcp",
+        "build": "npm run build:widget && npm run build:mcp",
+        "inspector": "npm run inspector --workspace=packages/playground"
+    }
+}
+
