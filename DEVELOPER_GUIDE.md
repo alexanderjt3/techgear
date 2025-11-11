@@ -13,8 +13,8 @@ This comprehensive guide walks through building **TechGear**, an electronics sho
 1. [Prerequisites](#1-prerequisites)
 2. [Understanding the Architecture](#2-understanding-the-architecture)
 3. [Project Structure Setup](#3-project-structure-setup)
-4. [Building Helper Utilities](#4-building-helper-utilities)
-5. [Creating the Headphones Widget Package](#5-creating-the-headphones-widget-package)
+4. [Creating the Headphones Widget Package](#4-creating-the-headphones-widget-package)
+5. [Building Helper Utilities](#5-building-helper-utilities)
 6. [Building the MCP Server](#6-building-the-mcp-server)
 7. [Critical Configuration for Widget Rendering](#7-critical-configuration-for-widget-rendering)
 8. [Testing with MCPJam Inspector](#8-testing-with-mcpjam-inspector)
@@ -233,229 +233,36 @@ techgear/
 
 ---
 
-## 4. Building Helper Utilities
-
-Instead of using a proprietary framework, we'll create simple helper functions that generate MCP metadata. This makes the code easier to understand and maintain.
-
-### Step 1: Define TypeScript Types
-
-Create `packages/mcp/src/lib/types.ts`:
-
-```typescript
-import { McpServer } from "mcp-handler";
-
-/**
- * Logger interface for widget registration
- */
-export interface Logger {
-    info: (message: string) => void;
-    error: (message: string) => void;
-    warn: (message: string) => void;
-    debug: (message: string) => void;
-}
-
-/**
- * Context provided to widgets during registration
- */
-export interface WidgetContext {
-    server: McpServer;           // MCP server instance
-    logger: Logger;              // Logging interface
-    basePath: string;            // Path to widget HTML (e.g., "/widgets/headphones")
-    getHtml: (path: string) => Promise<string>;  // Function to fetch HTML
-}
-
-/**
- * Widget metadata for OpenAI Apps SDK
- */
-export interface WidgetMetadata {
-    templateUri: string;         // URI to widget HTML (e.g., "ui://headphones")
-    invoking: string;            // Status message while tool executes
-    invoked: string;             // Status message after tool completes
-    prefersBorder: boolean;      // Whether widget should have border/shadow
-}
-
-/**
- * Widget configuration
- */
-export interface WidgetConfig {
-    id: string;                  // Unique widget identifier
-    name: string;                // Display name
-    description: string;         // Human-readable description
-}
-
-/**
- * Widget package structure
- */
-export interface WidgetPackage {
-    config: WidgetConfig;
-    registerWidget: (context: WidgetContext) => Promise<void>;
-}
-```
-
-**Why these types?** TypeScript types provide compile-time safety and make it clear what data flows between components. The `WidgetContext` is the contract between the MCP server and widget packages.
-
-### Step 2: Create Metadata Helper Functions
-
-Create `packages/mcp/src/lib/helpers.ts`:
-
-```typescript
-import { WidgetMetadata } from "./types";
-
-/**
- * Create metadata for MCP resource registration
- * 
- * Resources are HTML templates that ChatGPT loads to render widgets.
- * This metadata tells ChatGPT how to configure the widget iframe.
- * 
- * @param description - Human-readable description of what the widget displays
- * @param prefersBorder - Whether the widget should render with a border and shadow
- * @returns Metadata object with OpenAI-specific fields
- */
-export function createResourceMeta(
-    description: string,
-    prefersBorder: boolean
-): Record<string, unknown> {
-    return {
-        "openai/widgetDescription": description,
-        "openai/widgetPrefersBorder": prefersBorder,
-    };
-}
-
-/**
- * Create metadata for MCP tool registration
- * 
- * Tools are functions that ChatGPT can call. This metadata links the tool
- * to a widget template and configures status messages.
- * 
- * @param metadata - Widget metadata configuration
- * @returns Metadata object with OpenAI-specific fields
- */
-export function createWidgetMeta(
-    metadata: WidgetMetadata
-): Record<string, unknown> {
-    return {
-        "openai/outputTemplate": metadata.templateUri,
-        "openai/toolInvocation/invoking": metadata.invoking,
-        "openai/toolInvocation/invoked": metadata.invoked,
-    };
-}
-
-/**
- * Get base URL for the application
- * 
- * In development, returns localhost with the port from environment.
- * In production, returns the Vercel URL or other deployment URL.
- * 
- * @returns Base URL string
- */
-export function getBaseURL(): string {
-    // In production on Vercel
-    if (process.env.VERCEL_URL) {
-        return `https://${process.env.VERCEL_URL}`;
-    }
-
-    // In development
-    const port = process.env.PORT || 3000;
-    return `http://localhost:${port}`;
-}
-```
-
-**Plain English Explanation:**
-
-- **`createResourceMeta`**: When you register a resource (HTML template), this function creates the metadata that tells ChatGPT "this is a widget, here's what it displays, and here's how to render it."
-- **`createWidgetMeta`**: When you register a tool (function), this function links the tool to its widget template and sets the loading messages users see.
-- **`getBaseURL`**: Figures out what URL to use based on where the app is running (localhost in development, your domain in production).
-
-### Step 3: Create Widget Loader
-
-Create `packages/mcp/src/lib/loadWidgets.ts`:
-
-```typescript
-import { WidgetContext } from "./types";
-import config from "../../mcp.config";
-
-const WIDGET_REGISTRY = config.widgets;
-
-/**
- * Load and register all enabled widgets from the configuration
- * 
- * This function:
- * 1. Reads the widget registry from mcp.config.ts
- * 2. Filters widgets based on environment (development vs production)
- * 3. Calls each widget's registerWidget function
- * 4. Handles errors gracefully so one broken widget doesn't stop others
- * 
- * @param context - Server context to pass to widgets
- */
-export async function loadWidgets(
-    context: Omit<WidgetContext, "basePath">
-): Promise<void> {
-    const { logger } = context;
-    const isProduction = process.env.NODE_ENV === "production";
-
-    logger.info(
-        `Loading widgets from registry (NODE_ENV: ${process.env.NODE_ENV || "development"})...`
-    );
-
-    // Filter based on environment
-    const enabledWidgets = Object.entries(WIDGET_REGISTRY).filter(
-        ([, entry]) => {
-            // Widget must be enabled
-            if (!entry.mcp.enabled) return false;
-
-            // In production, only include production-ready widgets
-            if (isProduction && !entry.mcp.production) return false;
-
-            return true;
-        }
-    );
-
-    logger.info(
-        `Found ${enabledWidgets.length} ${isProduction ? "production" : "enabled"} widgets: ${enabledWidgets.map(([id]) => id).join(", ")}`
-    );
-
-    // Register each widget
-    for (const [widgetId, entry] of enabledWidgets) {
-        try {
-            const { package: widgetPackage, mcp } = entry;
-
-            logger.info(
-                `Registering widget: ${widgetPackage.config.name} (${widgetId})`
-            );
-
-            // Create context with widget-specific basePath
-            const widgetContext: WidgetContext = {
-                ...context,
-                basePath: mcp.basePath,  // e.g., "/widgets/headphones"
-            };
-
-            // Call the widget's registration function
-            await widgetPackage.registerWidget(widgetContext);
-            
-            logger.info(
-                `Successfully registered widget: ${widgetPackage.config.name}`
-            );
-        } catch (error) {
-            // Log error but continue with other widgets
-            logger.error(
-                `Failed to register widget ${widgetId}: ${error instanceof Error ? error.message : String(error)}`
-            );
-        }
-    }
-
-    logger.info("Widget loading complete");
-}
-```
-
-**Why this pattern?** This loader function makes it easy to add new widgets. Just import the widget package and add it to `mcp.config.ts` - no need to modify the server code.
-
----
-
-## 5. Creating the Headphones Widget Package
+## 4. Creating the Headphones Widget Package
 
 Now we'll build the widget package that contains the tool logic, data, and React UI.
 
+### Overview
+
+In this section, we'll create a complete, self-contained widget package with the following components:
+
+1. **Package Setup**: Initialize npm package with TypeScript compilation
+2. **TypeScript Configuration**: Configure compiler for React and type declarations
+3. **Widget Configuration**: Define widget identity and display preferences
+4. **Widget Types**: Create TypeScript interfaces for the widget
+5. **Business Logic**: Implement data storage and filtering algorithms
+6. **Zod Schemas**: Define runtime validation schemas
+7. **AI Prompts**: Write descriptions that help ChatGPT understand when to use the widget
+8. **React Component**: Build the UI that renders in ChatGPT
+9. **ChatGPT Hook**: Create the data-fetching mechanism using React 18+ patterns
+10. **MCP Registration**: Connect the widget to the MCP server
+11. **Public API**: Export the widget package for consumption
+12. **Build**: Compile TypeScript to JavaScript
+
+This widget package is designed to be:
+- **Self-contained**: All logic, data, and UI in one package
+- **Reusable**: Can be imported into any MCP server
+- **Type-safe**: Full TypeScript coverage with runtime validation
+- **Educational**: Clear code structure with explanatory comments
+
 ### Step 1: Initialize the Widget Package
+
+**Purpose**: Set up the widget as an npm package with TypeScript compilation. This creates the foundation for a reusable, distributable widget that can be imported by the MCP server.
 
 ```bash
 cd packages/widgets/headphones-widget
@@ -498,6 +305,8 @@ npm install
 
 ### Step 2: Configure TypeScript
 
+**Purpose**: Configure TypeScript to compile React/JSX code into JavaScript that the MCP server can import. The configuration enables strict type checking, generates declaration files for TypeScript consumers, and targets modern JavaScript features.
+
 Create `packages/widgets/headphones-widget/tsconfig.json`:
 
 ```json
@@ -524,40 +333,86 @@ Create `packages/widgets/headphones-widget/tsconfig.json`:
 }
 ```
 
-### Step 3: Define Widget Configuration
+**Key configuration options**:
+- `jsx: "react-jsx"`: Use React 17+ automatic JSX runtime (no need to import React)
+- `declaration: true`: Generate `.d.ts` files for TypeScript consumers
+- `outDir: "./dist"`: Compiled output goes to `dist/` folder
+- `strict: true`: Enable all strict type-checking options
 
-Create `packages/widgets/headphones-widget/src/config.ts`:
+### Step 3: Define Zod Schemas
+
+**Purpose**: Create type-safe schemas using Zod for runtime validation. Zod provides both TypeScript types (compile-time) and validation logic (runtime), ensuring that data from ChatGPT matches expected formats before it reaches your business logic.
+
+**Why Zod?**
+- **Dual purpose**: Single schema definition generates both TypeScript types and runtime validators
+- **Safety**: Catches invalid data before it reaches your business logic
+- **Documentation**: Schema serves as living documentation of your data structures
+- **Error messages**: Provides clear, actionable error messages when validation fails
 
 ```typescript
-import { WidgetConfig, WidgetMetadata } from "./types";
+import z from "zod";
 
 /**
- * Widget configuration
- * Basic information about the widget
+ * Input schema for the find_headphones tool
+ * 
+ * Zod schemas provide both TypeScript types AND runtime validation.
+ * If ChatGPT sends invalid data, Zod will catch it before it reaches your code.
  */
-export const headphonesWidgetConfig: WidgetConfig = {
-    id: "headphones",
-    name: "Headphones Finder",
-    description: "Interactive widget for browsing and filtering headphones",
-};
+export const FindHeadphonesToolInputContract = z.object({
+    priceBracket: z
+        .enum(["budget", "midrange", "premium", "all"])
+        .optional()
+        .describe("Price range filter: budget, midrange, premium, or all"),
+    activity: z
+        .enum(["commuting", "gaming", "studio", "fitness", "all"])
+        .optional()
+        .describe("Activity filter: commuting, gaming, studio, fitness, or all"),
+    style: z
+        .enum(["in-ear", "on-ear", "over-ear", "all"])
+        .optional()
+        .describe("Style filter: in-ear, on-ear, over-ear, or all"),
+});
 
 /**
- * Widget metadata for OpenAI Apps SDK
- * Controls how the widget renders and what messages users see
+ * Headphone data structure
+ * 
+ * Each headphone must have these fields. This schema ensures data consistency.
  */
-export const headphonesWidgetMetadata: WidgetMetadata = {
-    templateUri: "ui://headphones",           // Unique identifier for the HTML template
-    invoking: "Finding headphones...",        // Message shown while tool executes
-    invoked: "Headphones found",              // Message shown after tool completes
-    prefersBorder: true,                      // Render with border and shadow
-};
+export const HeadphoneContract = z.object({
+    id: z.string(),
+    name: z.string(),
+    priceBracket: z.enum(["budget", "midrange", "premium"]),
+    activity: z.enum(["commuting", "gaming", "studio", "fitness"]),
+    style: z.enum(["in-ear", "on-ear", "over-ear"]),
+    price: z.string(),
+    description: z.string(),
+    ctaUrl: z.string(),
+    imageUrl: z.string().optional(),
+});
+
+/**
+ * Output schema for the find_headphones tool
+ * 
+ * This is what your tool returns to ChatGPT: an array of headphones
+ * and an optional summary text.
+ */
+export const FindHeadphonesToolOutputContract = z.object({
+    headphones: z.array(HeadphoneContract),
+    summary: z.string().optional().describe("Optional summary of the results"),
+});
+
+// TypeScript types inferred from Zod schemas
+export type FindHeadphonesToolInput = z.infer<typeof FindHeadphonesToolInputContract>;
+export type FindHeadphonesToolOutput = z.infer<typeof FindHeadphonesToolOutputContract>;
+export type Headphone = z.infer<typeof HeadphoneContract>;
 ```
 
-**Plain English:** This configuration defines what the widget is called, what it does, and how ChatGPT should display it.
+
+
 
 ### Step 4: Create Data and Filtering Logic
 
-Create `packages/widgets/headphones-widget/src/data/headphones.ts`:
+**Purpose**: Implement the business logic layer with sample data and filtering functions. In a production app, this would connect to a database or API. For this educational example, we use hardcoded data to demonstrate the filtering patterns.
 
 ```typescript
 import { Headphone } from "../semantic/contracts";
@@ -669,256 +524,16 @@ export function filterHeadphones(
 }
 ```
 
-**Plain English:** This is your data layer. `HEADPHONES` is the database (hardcoded for simplicity), and `filterHeadphones` is the query function that returns headphones matching the user's criteria.
+**Data layer breakdown**:
+- **`HEADPHONES` array**: Serves as our in-memory database with 6 diverse products covering different price points, activities, and styles
+- **`filterHeadphones()` function**: Core business logic that applies multiple filters using AND logic (all specified criteria must match)
+- **Filter behavior**: Each filter parameter is optional; omit a filter or pass "all" to skip that filter
 
-### Step 5: Define Zod Schemas
 
-Create `packages/widgets/headphones-widget/src/semantic/contracts.ts`:
 
-```typescript
-import z from "zod";
+### Step 5: Create ChatGPT Integration Hook (CRITICAL)
 
-/**
- * Input schema for the find_headphones tool
- * 
- * Zod schemas provide both TypeScript types AND runtime validation.
- * If ChatGPT sends invalid data, Zod will catch it before it reaches your code.
- */
-export const FindHeadphonesToolInputContract = z.object({
-    priceBracket: z
-        .enum(["budget", "midrange", "premium", "all"])
-        .optional()
-        .describe("Price range filter: budget, midrange, premium, or all"),
-    activity: z
-        .enum(["commuting", "gaming", "studio", "fitness", "all"])
-        .optional()
-        .describe("Activity filter: commuting, gaming, studio, fitness, or all"),
-    style: z
-        .enum(["in-ear", "on-ear", "over-ear", "all"])
-        .optional()
-        .describe("Style filter: in-ear, on-ear, over-ear, or all"),
-});
-
-/**
- * Headphone data structure
- * 
- * Each headphone must have these fields. This schema ensures data consistency.
- */
-export const HeadphoneContract = z.object({
-    id: z.string(),
-    name: z.string(),
-    priceBracket: z.enum(["budget", "midrange", "premium"]),
-    activity: z.enum(["commuting", "gaming", "studio", "fitness"]),
-    style: z.enum(["in-ear", "on-ear", "over-ear"]),
-    price: z.string(),
-    description: z.string(),
-    ctaUrl: z.string(),
-    imageUrl: z.string().optional(),
-});
-
-/**
- * Output schema for the find_headphones tool
- * 
- * This is what your tool returns to ChatGPT: an array of headphones
- * and an optional summary text.
- */
-export const FindHeadphonesToolOutputContract = z.object({
-    headphones: z.array(HeadphoneContract),
-    summary: z.string().optional().describe("Optional summary of the results"),
-});
-
-// TypeScript types inferred from Zod schemas
-export type FindHeadphonesToolInput = z.infer<typeof FindHeadphonesToolInputContract>;
-export type FindHeadphonesToolOutput = z.infer<typeof FindHeadphonesToolOutputContract>;
-export type Headphone = z.infer<typeof HeadphoneContract>;
-```
-
-**Why Zod?** Zod provides both compile-time TypeScript types and runtime validation. This means invalid data is caught early, and you get helpful error messages instead of cryptic runtime failures.
-
-### Step 6: Write AI-Facing Descriptions
-
-Create `packages/widgets/headphones-widget/src/semantic/prompts.ts`:
-
-```typescript
-/**
- * AI-facing descriptions for the headphones widget
- * 
- * These strings are shown to ChatGPT to help it understand when and how
- * to use your tool. Write them clearly and include examples.
- */
-export const headphonesWidgetPrompts = {
-    toolTitle: "Find Headphones",
-    
-    toolDescription: `Find and filter headphones based on price, activity, and style.
-
-Use this tool when users ask about headphones, earbuds, or audio equipment.
-
-Examples:
-- "Show me budget headphones"
-- "Find gaming headphones"
-- "I need over-ear headphones for commuting"
-- "What headphones do you have for the gym?"
-
-Filters:
-- priceBracket: budget ($50-100), midrange ($100-200), premium ($200+), or all
-- activity: commuting, gaming, studio, fitness, or all
-- style: in-ear, on-ear, over-ear, or all
-
-All filters are optional. Omit filters to show all headphones.`,
-
-    resourceTitle: "Headphones Widget HTML",
-    
-    resourceDescription: "HTML template for the interactive headphones carousel widget",
-    
-    widgetDescription: "Displays an interactive carousel of headphone recommendations with filtering options and detailed product information",
-};
-```
-
-**Plain English:** These descriptions are how ChatGPT learns about your tool. The better these descriptions, the more accurately ChatGPT will know when to call your tool.
-
-### Step 7: Create React Component
-
-Create `packages/widgets/headphones-widget/src/components/HeadphonesWidget.tsx`:
-
-```typescript
-"use client";
-
-import React from "react";
-import { Headphone } from "../semantic/contracts";
-import { useWidgetProps } from "../hooks/useOpenAI";
-
-interface HeadphonesWidgetProps {
-    fallbackData?: { headphones: Headphone[]; summary?: string };
-}
-
-/**
- * Headphones Widget Component
- * 
- * This React component renders the headphones carousel. It works in two modes:
- * 1. ChatGPT mode: Reads data from window.openai.toolOutput (injected by ChatGPT)
- * 2. Standalone mode: Uses fallbackData for preview pages
- */
-export function HeadphonesWidget({ fallbackData }: HeadphonesWidgetProps) {
-    // Get tool output from ChatGPT or use fallback
-    const toolOutput = useWidgetProps<{ headphones: Headphone[]; summary?: string }>(
-        fallbackData
-    );
-
-    // Handle loading state
-    if (!toolOutput) {
-        return (
-            <div className="flex items-center justify-center min-h-screen p-8">
-                <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
-                    <p className="text-gray-600">Loading headphones...</p>
-                </div>
-            </div>
-        );
-    }
-
-    const { headphones, summary } = toolOutput;
-
-    // Handle no results
-    if (!headphones || headphones.length === 0) {
-        return (
-            <div className="flex items-center justify-center min-h-screen p-8">
-                <div className="text-center">
-                    <p className="text-gray-600 mb-4">No headphones found matching your criteria.</p>
-                    <p className="text-sm text-gray-500">Try adjusting your filters.</p>
-                </div>
-            </div>
-        );
-    }
-
-    return (
-        <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-6">
-            <div className="max-w-6xl mx-auto">
-                {/* Summary */}
-                {summary && (
-                    <div className="mb-8">
-                        <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                            Headphones Recommendations
-                        </h1>
-                        <p className="text-lg text-gray-600">{summary}</p>
-                    </div>
-                )}
-
-                {/* Headphones Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {headphones.map((headphone) => (
-                        <HeadphoneCard key={headphone.id} headphone={headphone} />
-                    ))}
-                </div>
-            </div>
-        </div>
-    );
-}
-
-/**
- * Individual headphone card component
- */
-function HeadphoneCard({ headphone }: { headphone: Headphone }) {
-    return (
-        <div className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 overflow-hidden">
-            {/* Header */}
-            <div className="bg-gradient-to-r from-blue-500 to-purple-600 p-4">
-                <h3 className="text-xl font-bold text-white">{headphone.name}</h3>
-                <p className="text-sm text-blue-100 mt-1">{headphone.price}</p>
-            </div>
-
-            {/* Body */}
-            <div className="p-6">
-                {/* Badges */}
-                <div className="flex flex-wrap gap-2 mb-4">
-                    <Badge label={headphone.priceBracket} color="blue" />
-                    <Badge label={headphone.activity} color="green" />
-                    <Badge label={headphone.style} color="purple" />
-                </div>
-
-                {/* Description */}
-                <p className="text-gray-600 text-sm leading-relaxed mb-6">
-                    {headphone.description}
-                </p>
-
-                {/* CTA Button */}
-                <a
-                    href={headphone.ctaUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white text-center font-semibold py-3 px-4 rounded-lg hover:from-blue-600 hover:to-purple-700 transition-colors duration-200"
-                >
-                    View Details
-                </a>
-            </div>
-        </div>
-    );
-}
-
-/**
- * Badge component for displaying headphone attributes
- */
-function Badge({ label, color }: { label: string; color: string }) {
-    const colorClasses = {
-        blue: "bg-blue-100 text-blue-800",
-        green: "bg-green-100 text-green-800",
-        purple: "bg-purple-100 text-purple-800",
-    };
-
-    return (
-        <span
-            className={`inline-block px-3 py-1 text-xs font-semibold rounded-full ${colorClasses[color as keyof typeof colorClasses]}`}
-        >
-            {label}
-        </span>
-    );
-}
-```
-
-**Plain English:** This is the UI that users see in ChatGPT. The `useWidgetProps` hook reads data from `window.openai.toolOutput` (which ChatGPT injects), and the component renders a card for each headphone.
-
-### Step 8: Create ChatGPT Integration Hook (CRITICAL)
-
-Create `packages/widgets/headphones-widget/src/hooks/useOpenAI.ts`:
+**Purpose**: Implement the data-fetching mechanism that receives tool output from ChatGPT. This uses React 18's `useSyncExternalStore` for event-driven reactivity, replacing older polling patterns with immediate, efficient updates when ChatGPT injects data.
 
 ```typescript
 "use client";
@@ -1036,15 +651,240 @@ export function useIsChatGptApp(): boolean {
 }
 ```
 
-**Why this is critical:** This hook is how your widget gets data from ChatGPT. The old approach (polling with `setInterval`) had timing issues and wasted CPU. This event-driven approach using `useSyncExternalStore` is:
-- **Immediate**: Reacts instantly when ChatGPT injects data
-- **Efficient**: No polling overhead
-- **Correct**: Follows React 18+ patterns
-- **Official**: Matches OpenAI's examples
+**Why this approach is critical**:
+- **Immediate reactivity**: Responds instantly when ChatGPT injects data (no polling delay)
+- **Efficient**: No wasted CPU cycles checking repeatedly
+- **React 18+ compliant**: Uses `useSyncExternalStore` API as intended
+- **Event-driven**: Subscribes to ChatGPT's `openai:set_globals` custom event
+- **Official pattern**: Matches OpenAI's reference implementations
 
-### Step 9: Create MCP Registration Logic
+**Comparison to old approach**:
+```typescript
+// ❌ OLD: Polling (don't use)
+setInterval(() => {
+  if (window.openai?.toolOutput) {
+    setData(window.openai.toolOutput);
+  }
+}, 1000);
 
-Create `packages/widgets/headphones-widget/src/register.ts`:
+// ✅ NEW: Event-driven (use this)
+useSyncExternalStore(
+  (onChange) => {
+    window.addEventListener("openai:set_globals", onChange);
+    return () => window.removeEventListener("openai:set_globals", onChange);
+  },
+  () => window.openai?.toolOutput
+);
+```
+
+
+
+### Step 6: Create React Component
+
+**Purpose**: Build the user interface that renders in ChatGPT. This React component receives data from `window.openai.toolOutput` (injected by ChatGPT) and renders an interactive, styled widget that displays headphone recommendations.
+
+```typescript
+"use client";
+
+import React from "react";
+import { Headphone } from "../semantic/contracts";
+import { useWidgetProps } from "../hooks/useOpenAI";
+
+interface HeadphonesWidgetProps {
+    fallbackData?: { headphones: Headphone[]; summary?: string };
+}
+
+/**
+ * Headphones Widget Component
+ * 
+ * This React component renders the headphones carousel. It works in two modes:
+ * 1. ChatGPT mode: Reads data from window.openai.toolOutput (injected by ChatGPT)
+ * 2. Standalone mode: Uses fallbackData for preview pages
+ */
+export function HeadphonesWidget({ fallbackData }: HeadphonesWidgetProps) {
+    // Get tool output from ChatGPT or use fallback
+    const toolOutput = useWidgetProps<{ headphones: Headphone[]; summary?: string }>(
+        fallbackData
+    );
+
+    // Handle loading state
+    if (!toolOutput) {
+        return (
+            {/* Loader Component */}
+        );
+    }
+
+    const { headphones, summary } = toolOutput;
+
+    // Handle no results
+    if (!headphones || headphones.length === 0) {
+        return (
+            {/* Placeholder */}
+        );
+    }
+
+    return (
+        <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-6">
+            <div className="max-w-6xl mx-auto">
+                {/* Summary */}
+                {summary && (
+                    {summary}
+                )}
+                {/* Headphones Grid */}
+            </div>
+        </div>
+    );
+}
+
+/**
+ * Individual headphone card component
+ */
+function HeadphoneCard({ headphone }: { headphone: Headphone }) {
+    return (
+            {/* Header */}
+            {/* Body */}
+            {/* Badges */}
+            {/* Description */}
+            {/* CTA Button */}
+    );
+}
+
+function Badge({ label, color }: { label: string; color: string }) {
+{/* Badge Content*/}
+}
+```
+
+**Component architecture**:
+- **`HeadphonesWidget`**: Main component that handles data loading and state management
+- **`HeadphoneCard`**: Individual product card with styling and call-to-action
+- **`Badge`**: Reusable badge component for displaying attributes
+- **Data flow**: Uses `useWidgetProps()` hook to receive data from ChatGPT, with fallback support for standalone preview mode
+
+
+### Step 7: Create Widget Types
+
+**Purpose**: Define TypeScript interfaces specific to the widget. These types are referenced by the config file and used throughout the widget package for type safety.
+
+Create `packages/widgets/headphones-widget/src/types.ts`:
+
+```typescript
+/**
+ * Widget configuration structure
+ */
+export interface WidgetConfig {
+    id: string;
+    name: string;
+}
+
+/**
+ * Widget metadata for OpenAI Apps SDK
+ */
+export interface WidgetMetadata {
+    templateUri: string;
+    invoking: string;
+    invoked: string;
+    prefersBorder: boolean;
+}
+```
+
+**Why these types?** 
+- **`WidgetConfig`**: Basic identification fields for the widget (id and name)
+- **`WidgetMetadata`**: OpenAI-specific fields that control how the widget renders and what status messages appear
+
+**Note**: These are widget-specific types. The MCP server has its own types (like `WidgetContext` and `WidgetPackage`) that we'll see in Section 5.
+
+
+### Step 8: Define Widget Configuration
+
+**Purpose**: Create the widget's identity and display preferences. This configuration tells the MCP server what the widget is called and how ChatGPT should render and describe it to users.
+
+Create `packages/widgets/headphones-widget/src/config.ts`:
+
+Import the types we created for Widgets, then define the configuration.
+
+```typescript
+import { WidgetMetadata, WidgetConfig } from "./types";
+
+/**
+ * Configuration for the Headphones widget
+ */
+export const headphonesWidgetConfig: WidgetConfig = {
+    id: "headphones",
+    name: "Headphones Widget",
+} as const;
+
+/**
+ * Display metadata for the Headphones widget
+ */
+export const headphonesWidgetMetadata: WidgetMetadata = {
+    templateUri: "ui://widget/headphones-template.html",
+    invoking: "Finding headphones...",
+    invoked: "Headphones loaded",
+    prefersBorder: true,
+};
+```
+
+**Configuration breakdown**:
+- **`headphonesWidgetConfig`**: Basic widget identification
+  - `id`: Unique identifier used in the widget registry (`"headphones"`)
+  - `name`: Display name for logging and debugging
+- **`headphonesWidgetMetadata`**: OpenAI-specific display settings
+  - `templateUri`: Unique URI that links the tool to this widget's HTML template
+  - `invoking`: Status message shown while the tool executes
+  - `invoked`: Status message shown after the tool completes
+  - `prefersBorder`: Tells ChatGPT to render the widget with a border and shadow
+
+
+### Step 9: Write AI-Facing Descriptions
+
+**Purpose**: Create clear, example-rich descriptions that teach ChatGPT when and how to use your widget. These prompts are critical - they're how the AI learns about your tool's capabilities and appropriate use cases.
+
+```typescript
+/**
+ * AI-facing descriptions for the headphones widget
+ * 
+ * These strings are shown to ChatGPT to help it understand when and how
+ * to use your tool. Write them clearly and include examples.
+ */
+export const headphonesWidgetPrompts = {
+    toolTitle: "Find Headphones",
+    
+    toolDescription: `Find and filter headphones based on price, activity, and style.
+
+Use this tool when users ask about headphones, earbuds, or audio equipment.
+
+Examples:
+- "Show me budget headphones"
+- "Find gaming headphones"
+- "I need over-ear headphones for commuting"
+- "What headphones do you have for the gym?"
+
+Filters:
+- priceBracket: budget ($50-100), midrange ($100-200), premium ($200+), or all
+- activity: commuting, gaming, studio, fitness, or all
+- style: in-ear, on-ear, over-ear, or all
+
+All filters are optional. Omit filters to show all headphones.`,
+
+    resourceTitle: "Headphones Widget HTML",
+    
+    resourceDescription: "HTML template for the interactive headphones carousel widget",
+    
+    widgetDescription: "Displays an interactive carousel of headphone recommendations with filtering options and detailed product information",
+};
+```
+
+**Best practices for AI prompts**:
+- **Be explicit**: Clearly state when the tool should be used
+- **Provide examples**: Include diverse example queries that trigger the tool
+- **Explain parameters**: Describe what each filter does and what values are valid
+- **Use natural language**: Write as if teaching a colleague, not writing code documentation
+
+
+
+### Step 10: Create MCP Registration Logic
+
+**Purpose**: Build the bridge between your widget and the MCP server. This file defines how to register the widget's HTML template (resource) and tool (function) with the MCP server, and implements the tool's execution logic.
 
 ```typescript
 import { WidgetPackage, WidgetContext } from "./types";
@@ -1164,16 +1004,31 @@ export const headphonesWidgetPackage: WidgetPackage = {
 };
 ```
 
-**Plain English:** This file is the bridge between your widget and the MCP server. It:
-1. Tells the server "here's my HTML template"
-2. Tells the server "here's my tool and what it does"
-3. Defines what happens when the tool is called (filter headphones, return data)
+**Registration flow breakdown**:
 
-The critical part is the `structuredContent` field - this is what becomes `window.openai.toolOutput` in your React component.
+1. **STEP 1: Register HTML Resource**
+   - Fetches widget HTML from Next.js server (`/widgets/headphones`)
+   - Registers with unique URI (`ui://headphones`)
+   - Sets MIME type to `text/html+skybridge` (critical for ChatGPT)
+   - Includes metadata about widget description and border preference
 
-### Step 10: Create Public Exports
+2. **STEP 2: Register Tool**
+   - Defines tool name (`find_headphones`) and description
+   - Links tool to widget via `_meta` (contains `templateUri`)
+   - Specifies input schema (Zod schema for validation)
+   - Implements tool handler that:
+     - Receives validated input from ChatGPT
+     - Filters headphones using business logic
+     - Returns results with `structuredContent` (becomes `window.openai.toolOutput`)
 
-Create `packages/widgets/headphones-widget/src/index.ts`:
+**Critical fields**:
+- `mimeType: "text/html+skybridge"`: Must be exact for ChatGPT to recognize as widget
+- `_meta` in tool response: Links the tool's output to the correct widget template
+- `structuredContent`: Automatically injected into `window.openai.toolOutput` by ChatGPT
+
+### Step 11: Create Public Exports
+
+**Purpose**: Define the widget package's public API. This controls what other packages can import from your widget, creating a clean interface and hiding internal implementation details.
 
 ```typescript
 // Public exports for the widget package
@@ -1184,14 +1039,327 @@ export * from "./components/HeadphonesWidget";
 export * from "./hooks/useOpenAI";
 ```
 
-### Step 11: Build the Widget Package
+**What gets exported**:
+- `types`: TypeScript interfaces for widget configuration
+- `config`: Widget metadata and display preferences
+- `register`: The `headphonesWidgetPackage` that the MCP server imports
+- `HeadphonesWidget`: React component for standalone preview pages
+- `useOpenAI`: Hooks for ChatGPT integration (useful for other widgets)
+
+### Step 12: Build the Widget Package
+
+**Purpose**: Compile TypeScript source code to JavaScript that the MCP server can import. This generates the `dist/` folder with compiled `.js` files, `.d.ts` type definitions, and source maps.
 
 ```bash
 cd packages/widgets/headphones-widget
 npm run build
 ```
 
-This compiles TypeScript to JavaScript in the `dist/` folder. The MCP server will import from this compiled code.
+**Expected output**:
+```
+tsc
+# No output = successful compilation
+# Creates dist/ folder with:
+#   - Compiled .js files
+#   - Type declaration .d.ts files
+#   - Source maps .js.map files
+```
+
+**What happens**:
+1. TypeScript compiler reads `tsconfig.json`
+2. Compiles all `src/**/*.ts` and `src/**/*.tsx` files
+3. Outputs to `dist/` folder
+4. Generates type declarations for TypeScript consumers
+5. MCP server imports from `dist/index.js`
+
+---
+
+## 5. Building Helper Utilities
+
+Instead of using a proprietary framework, we'll create simple helper functions that generate MCP metadata. This makes the code easier to understand and maintain.
+
+### Overview
+
+In this section, we'll build three essential utility modules that form the foundation of our MCP server:
+
+1. **Type Definitions (`types.ts`)**: TypeScript interfaces that define the contracts between components
+   - `WidgetContext`: The data structure passed to widgets during registration
+   - `WidgetMetadata`: Configuration for how widgets render in ChatGPT
+   - `WidgetConfig`: Basic widget identification and description
+   - `WidgetPackage`: The structure every widget package must export
+
+2. **Metadata Helpers (`helpers.ts`)**: Functions that create MCP-compliant metadata objects
+   - `createResourceMeta()`: Generates metadata for resource registration (HTML templates)
+   - `createWidgetMeta()`: Generates metadata for tool registration (links tools to widgets)
+   - `getBaseURL()`: Determines the correct base URL for development vs. production
+
+3. **Widget Loader (`loadWidgets.ts`)**: Dynamic widget registration system
+   - `loadWidgets()`: Reads widget configuration and registers all enabled widgets
+   - Handles environment-specific filtering (development vs. production)
+   - Provides error isolation (one broken widget doesn't crash the server)
+
+These utilities eliminate the need for complex frameworks while maintaining clean, type-safe code. Let's build each one step by step.
+
+### Step 1: Define TypeScript Types
+
+**Purpose**: Create TypeScript interfaces that provide compile-time safety and clear contracts between the MCP server and widget packages. These types ensure that widgets and the server communicate correctly and make it obvious what data flows where.
+
+Create `packages/mcp/src/lib/types.ts`:
+
+```typescript
+import { McpServer } from "mcp-handler";
+
+/**
+ * Logger interface for widget registration
+ */
+export interface Logger {
+    info: (message: string) => void;
+    error: (message: string) => void;
+    warn: (message: string) => void;
+    debug: (message: string) => void;
+}
+
+/**
+ * Context provided to widgets during registration
+ */
+export interface WidgetContext {
+    server: McpServer;           // MCP server instance
+    logger: Logger;              // Logging interface
+    basePath: string;            // Path to widget HTML (e.g., "/widgets/headphones")
+    getHtml: (path: string) => Promise<string>;  // Function to fetch HTML
+}
+
+/**
+ * Widget metadata for OpenAI Apps SDK
+ */
+export interface WidgetMetadata {
+    templateUri: string;         // URI to widget HTML (e.g., "ui://headphones")
+    invoking: string;            // Status message while tool executes
+    invoked: string;             // Status message after tool completes
+    prefersBorder: boolean;      // Whether widget should have border/shadow
+}
+
+/**
+ * Widget configuration
+ */
+export interface WidgetConfig {
+    id: string;                  // Unique widget identifier
+    name: string;                // Display name
+    description: string;         // Human-readable description
+}
+
+/**
+ * Widget package structure
+ */
+export interface WidgetPackage {
+    config: WidgetConfig;
+    registerWidget: (context: WidgetContext) => Promise<void>;
+}
+```
+
+**Why these types?** TypeScript types provide compile-time safety and make it clear what data flows between components. The `WidgetContext` is the contract between the MCP server and widget packages.
+
+### Step 2: Create Metadata Helper Functions
+
+**Purpose**: Build simple utility functions that generate MCP-compliant metadata objects. These functions encapsulate the OpenAI-specific metadata format, making it easy to register resources and tools without memorizing the exact field names and structure.
+
+Create `packages/mcp/src/lib/helpers.ts`:
+
+```typescript
+import { WidgetMetadata } from "./types";
+```
+
+#### Function 1: `createResourceMeta()`
+
+**Purpose**: Generates metadata for registering HTML resources (widget templates) with the MCP server. This tells ChatGPT what the widget displays and how it should be rendered (with or without a border).
+
+**When to use**: Call this when registering a resource with `server.registerResource()`. The metadata controls the widget's appearance and provides context to ChatGPT about what the widget shows.
+
+```typescript
+/**
+ * Create metadata for MCP resource registration
+ * 
+ * Resources are HTML templates that ChatGPT loads to render widgets.
+ * This metadata tells ChatGPT how to configure the widget iframe.
+ * 
+ * @param description - Human-readable description of what the widget displays
+ * @param prefersBorder - Whether the widget should render with a border and shadow
+ * @returns Metadata object with OpenAI-specific fields
+ */
+export function createResourceMeta(
+    description: string,
+    prefersBorder: boolean
+): Record<string, unknown> {
+    return {
+        "openai/widgetDescription": description,
+        "openai/widgetPrefersBorder": prefersBorder,
+    };
+}
+```
+
+#### Function 2: `createWidgetMeta()`
+
+**Purpose**: Generates metadata for registering tools with the MCP server. This links a tool to its widget template and configures the status messages users see while the tool executes.
+
+**When to use**: Call this when registering a tool with `server.registerTool()` and when returning tool results. The metadata connects the tool's output to the correct widget template and provides user-friendly status messages.
+
+```typescript
+/**
+ * Create metadata for MCP tool registration
+ * 
+ * Tools are functions that ChatGPT can call. This metadata links the tool
+ * to a widget template and configures status messages.
+ * 
+ * @param metadata - Widget metadata configuration
+ * @returns Metadata object with OpenAI-specific fields
+ */
+export function createWidgetMeta(
+    metadata: WidgetMetadata
+): Record<string, unknown> {
+    return {
+        "openai/outputTemplate": metadata.templateUri,
+        "openai/toolInvocation/invoking": metadata.invoking,
+        "openai/toolInvocation/invoked": metadata.invoked,
+    };
+}
+```
+
+#### Function 3: `getBaseURL()`
+
+**Purpose**: Determines the correct base URL for the application based on the environment. In development, this ensures widgets can fetch their HTML from localhost. In production, it adapts to the deployment platform (Vercel, etc.).
+
+**When to use**: Call this when you need to construct absolute URLs for fetching widget HTML or other resources. The MCP server uses this to fetch widget templates during registration.
+
+```typescript
+/**
+ * Get base URL for the application
+ * 
+ * In development, returns localhost with the port from environment.
+ * In production, returns the Vercel URL or other deployment URL.
+ * 
+ * @returns Base URL string
+ */
+export function getBaseURL(): string {
+    // In production on Vercel
+    if (process.env.VERCEL_URL) {
+        return `https://${process.env.VERCEL_URL}`;
+    }
+
+    // In development
+    const port = process.env.PORT || 3000;
+    return `http://localhost:${port}`;
+}
+```
+
+**Summary**: These three helper functions abstract away the OpenAI metadata format, making your code cleaner and more maintainable. Instead of remembering field names like `"openai/outputTemplate"`, you just call `createWidgetMeta()` with your widget configuration.
+
+### Step 3: Create Widget Loader
+
+**Purpose**: Build a dynamic widget registration system that reads widget configuration and automatically registers all enabled widgets with the MCP server. This eliminates the need to manually register widgets in the server code - just add them to the configuration file.
+
+**Key features**:
+- **Environment filtering**: Only loads production-ready widgets in production
+- **Error isolation**: If one widget fails to register, others continue loading
+- **Logging**: Provides detailed feedback about the registration process
+- **Dynamic context**: Each widget receives its own basePath for HTML serving
+
+Create `packages/mcp/src/lib/loadWidgets.ts`:
+
+```typescript
+import { WidgetContext } from "./types";
+import config from "../../mcp.config";
+
+const WIDGET_REGISTRY = config.widgets;
+```
+
+#### Function: `loadWidgets()`
+
+**Purpose**: Orchestrates the widget registration process. This function reads the widget registry from `mcp.config.ts`, filters based on environment, and calls each widget's `registerWidget()` function.
+
+**How it works**:
+1. Reads `WIDGET_REGISTRY` from configuration
+2. Filters widgets based on `enabled` flag and environment (development vs. production)
+3. For each enabled widget, creates a widget-specific context with its basePath
+4. Calls the widget's `registerWidget()` function to register tools and resources
+5. Handles errors gracefully so one broken widget doesn't crash the server
+
+```typescript
+/**
+ * Load and register all enabled widgets from the configuration
+ * 
+ * This function:
+ * 1. Reads the widget registry from mcp.config.ts
+ * 2. Filters widgets based on environment (development vs production)
+ * 3. Calls each widget's registerWidget function
+ * 4. Handles errors gracefully so one broken widget doesn't stop others
+ * 
+ * @param context - Server context to pass to widgets
+ */
+export async function loadWidgets(
+    context: Omit<WidgetContext, "basePath">
+): Promise<void> {
+    const { logger } = context;
+    const isProduction = process.env.NODE_ENV === "production";
+
+    logger.info(
+        `Loading widgets from registry (NODE_ENV: ${process.env.NODE_ENV || "development"})...`
+    );
+
+    // Filter based on environment
+    const enabledWidgets = Object.entries(WIDGET_REGISTRY).filter(
+        ([, entry]) => {
+            // Widget must be enabled
+            if (!entry.mcp.enabled) return false;
+
+            // In production, only include production-ready widgets
+            if (isProduction && !entry.mcp.production) return false;
+
+            return true;
+        }
+    );
+
+    logger.info(
+        `Found ${enabledWidgets.length} ${isProduction ? "production" : "enabled"} widgets: ${enabledWidgets.map(([id]) => id).join(", ")}`
+    );
+
+    // Register each widget
+    for (const [widgetId, entry] of enabledWidgets) {
+        try {
+            const { package: widgetPackage, mcp } = entry;
+
+            logger.info(
+                `Registering widget: ${widgetPackage.config.name} (${widgetId})`
+            );
+
+            // Create context with widget-specific basePath
+            const widgetContext: WidgetContext = {
+                ...context,
+                basePath: mcp.basePath,  // e.g., "/widgets/headphones"
+            };
+
+            // Call the widget's registration function
+            await widgetPackage.registerWidget(widgetContext);
+            
+            logger.info(
+                `Successfully registered widget: ${widgetPackage.config.name}`
+            );
+        } catch (error) {
+            // Log error but continue with other widgets
+            logger.error(
+                `Failed to register widget ${widgetId}: ${error instanceof Error ? error.message : String(error)}`
+            );
+        }
+    }
+
+    logger.info("Widget loading complete");
+}
+```
+
+**Benefits of this approach**:
+- **Scalable**: Add new widgets by updating configuration, not code
+- **Maintainable**: Clear separation between widget packages and server logic
+- **Robust**: Error handling prevents one broken widget from affecting others
+- **Flexible**: Environment-based filtering for development vs. production
 
 ---
 
@@ -1199,7 +1367,29 @@ This compiles TypeScript to JavaScript in the `dist/` folder. The MCP server wil
 
 Now we'll create the Next.js server that exposes the MCP endpoint and serves widget HTML.
 
+### Overview
+
+In this section, we'll build the MCP server using Next.js App Router. This server has three main responsibilities:
+
+1. **MCP Endpoint (`/mcp`)**: HTTP route that handles JSON-RPC requests from ChatGPT
+2. **Widget HTML Serving**: Next.js pages that render widget HTML for ChatGPT iframes
+3. **Widget Registry**: Configuration system that dynamically loads enabled widgets
+
+The architecture consists of:
+- **Next.js API Route**: Handles MCP protocol requests and responses
+- **Widget Configuration**: Central registry (`mcp.config.ts`) listing all widgets
+- **Widget Preview Pages**: Standalone pages for testing widgets during development
+- **Critical Configuration**: Settings that ensure widgets render correctly in ChatGPT
+
+**Key features**:
+- **Dynamic widget loading**: Widgets are loaded from configuration, not hardcoded
+- **Development-friendly**: Preview pages let you test widgets without ChatGPT
+- **Production-ready**: Proper configuration for deployment to Vercel or other platforms
+- **Type-safe**: Full TypeScript integration with widget packages
+
 ### Step 1: Initialize Next.js App
+
+**Purpose**: Create a Next.js 15 application with App Router, TypeScript, and Tailwind CSS. This provides the foundation for both the MCP endpoint and widget preview pages.
 
 ```bash
 cd packages/mcp
@@ -1216,19 +1406,23 @@ npx create-next-app@latest . --ts --app --eslint --src-dir --import-alias "@/*" 
 
 ### Step 2: Install Dependencies
 
+**Purpose**: Add the required npm packages for MCP protocol handling, widget integration, and TypeScript support.
+
 ```bash
 npm install mcp-handler headphones-widget
 npm install @modelcontextprotocol/sdk
 ```
 
-**What are these?**
-- `mcp-handler`: Simplifies creating MCP servers with Next.js
-- `headphones-widget`: Your local widget package
-- `@modelcontextprotocol/sdk`: Official MCP SDK
+**Package breakdown**:
+- **`mcp-handler`**: Utility library that simplifies creating MCP servers with Next.js by handling JSON-RPC protocol details
+- **`headphones-widget`**: Your locally-built widget package (from npm workspaces)
+- **`@modelcontextprotocol/sdk`**: Official MCP SDK with types and utilities
 
 ### Step 3: Configure Next.js (CRITICAL FOR WIDGET RENDERING)
 
-Create `packages/mcp/next.config.ts`:
+**Purpose**: Configure Next.js with the critical `assetPrefix` setting that makes JavaScript assets load correctly in ChatGPT's sandboxed iframes. Without this configuration, widgets will appear as blank pages in ChatGPT.
+
+**Why this is critical**: When ChatGPT loads your widget HTML in an iframe, relative script paths like `/_next/static/chunks/main.js` fail because browsers resolve them relative to `chatgpt.com`, not your server. The `assetPrefix` makes all asset URLs absolute, so they load correctly even in iframes.
 
 ```typescript
 import type { NextConfig } from "next";
@@ -1264,11 +1458,34 @@ const nextConfig: NextConfig = {
 export default nextConfig;
 ```
 
-**This is critical!** Without `assetPrefix`, JavaScript won't load in ChatGPT iframes and your widget will be a blank page. This was one of the major issues discovered during development.
+**Configuration breakdown**:
+- **`assetPrefix`**: Converts relative URLs to absolute in development (`http://localhost:3000/_next/...`)
+- **`output: "standalone"`**: Optimizes for Docker and serverless deployments
+- **`transpilePackages`**: Tells Next.js to compile the widget package (required for local packages)
+
+**How it works**:
+```typescript
+// Without assetPrefix (fails in ChatGPT):
+<script src="/_next/static/chunks/main.js"></script>
+// Browser resolves: https://chatgpt.com/_next/static/chunks/main.js ❌
+
+// With assetPrefix (works in ChatGPT):
+<script src="http://localhost:3000/_next/static/chunks/main.js"></script>
+// Browser resolves: http://localhost:3000/_next/static/chunks/main.js ✅
+```
 
 ### Step 4: Create MCP Widget Registry
 
-Create `packages/mcp/mcp.config.ts`:
+
+**Purpose**: Build a centralized configuration file that declares all available widgets. This registry enables dynamic widget loading - add a new widget by updating this config file, no server code changes needed.
+`packages/mcp/mcp.config.ts`
+
+**Registry structure**:
+- **Widget ID** (e.g., `"headphones"`): Unique identifier for the widget
+- **`package`**: The imported widget package with `config` and `registerWidget`
+- **`mcp.enabled`**: Toggle to enable/disable the widget
+- **`mcp.production`**: Whether to include in production builds
+- **`mcp.basePath`**: URL path where widget HTML is served (e.g., `/widgets/headphones`)
 
 ```typescript
 import { headphonesWidgetPackage, WidgetPackage } from "headphones-widget";
@@ -1320,11 +1537,23 @@ const config: McpConfig = {
 export default config;
 ```
 
-**Plain English:** This file is your widget registry. To add a new widget, just import its package and add an entry here. No need to modify server code.
+
+
+**Scalability**: To add more widgets, simply import and add to the registry:
+```typescript
+widgets: {
+  headphones: { /* ... */ },
+  speakers: {  // New widget
+    package: speakersWidgetPackage,
+    mcp: { enabled: true, production: true, basePath: "/widgets/speakers" }
+  }
+}
+```
 
 ### Step 5: Create MCP Endpoint
 
-Create `packages/mcp/src/app/mcp/route.ts`:
+**Purpose**: Build the HTTP endpoint that ChatGPT communicates with. This route handles JSON-RPC requests, dynamically loads widgets from the registry, and returns tool results and widget HTML.
+`packages/mcp/src/app/mcp/route.ts`
 
 ```typescript
 import { createMcpHandler } from "mcp-handler";
@@ -1375,15 +1604,21 @@ export const GET = handler;
 export const POST = handler;
 ```
 
-**Plain English:** This is your MCP endpoint (`/mcp`). When ChatGPT makes a request, this handler:
-1. Creates an MCP server
-2. Loads all your widgets
-3. Processes the request
-4. Returns the response
+**Request flow**:
+1. **Handler creation**: `createMcpHandler()` sets up JSON-RPC request handling
+2. **Server initialization**: Creates MCP server instance with widget context
+3. **Widget loading**: Calls `loadWidgets()` to register all enabled widgets from config
+4. **Request processing**: Handles incoming requests (tool calls, resource reads, etc.)
+5. **Response**: Returns JSON-RPC formatted responses to ChatGPT
+
+**Key components**:
+- **`logger`**: Console-based logging for debugging
+- **`getHtml()`**: Fetches widget HTML from Next.js pages (e.g., `/widgets/headphones`)
+- **Exports**: Both `GET` and `POST` handlers (ChatGPT uses POST, GET for health checks)
 
 ### Step 6: Create Widget Preview Page
 
-Create `packages/mcp/src/app/widgets/headphones/page.tsx`:
+**Purpose**: Build a standalone page that renders the widget with fallback data. This enables testing and styling the widget during development without needing to call the MCP tool through ChatGPT.
 
 ```typescript
 import { HeadphonesWidget } from "headphones-widget";
@@ -1408,11 +1643,17 @@ export default function HeadphonesWidgetPage() {
 }
 ```
 
-**Why this page?** During development, you need to see your widget without calling the MCP tool. This preview page lets you test styling, layout, and interactions.
+**Benefits of preview pages**:
+- **Fast iteration**: Test widget changes without MCP protocol overhead
+- **Visual debugging**: See styling and layout issues immediately
+- **Component testing**: Verify React components render correctly
+- **Fallback data**: Test with various data scenarios by modifying fallback
+
+**Access**: Visit `http://localhost:3000/widgets/headphones` while dev server is running
 
 ### Step 7: Create Homepage
 
-Create `packages/mcp/src/app/page.tsx`:
+**Purpose**: Build an informative landing page that explains the MCP server, provides links to widget previews, and documents the available endpoints.
 
 ```typescript
 import Link from "next/link";
@@ -1474,6 +1715,8 @@ export default function HomePage() {
 
 ### Step 8: Start the Development Server
 
+**Purpose**: Launch the Next.js development server to test the MCP endpoint and widget preview pages locally.
+
 ```bash
 cd packages/mcp
 npm run dev
@@ -1490,10 +1733,25 @@ npm run dev
  ✓ Ready in 1234ms
 ```
 
-**Test it:**
-1. Visit `http://localhost:3000` - Should show homepage
-2. Visit `http://localhost:3000/widgets/headphones` - Should show widget with all headphones
-3. Visit `http://localhost:3000/mcp` - Should show a JSON error (normal - MCP clients use POST)
+**Verification checklist:**
+
+1. **Homepage test**
+   - Visit: `http://localhost:3000`
+   - Expected: Informative landing page with links to endpoints and documentation
+
+2. **Widget preview test**
+   - Visit: `http://localhost:3000/widgets/headphones`
+   - Expected: Rendered widget showing all 6 headphones with styling
+
+3. **MCP endpoint test**
+   - Visit: `http://localhost:3000/mcp`
+   - Expected: JSON error about invalid request (normal - endpoint expects POST with JSON-RPC)
+
+4. **Console logs**
+   - Look for: Widget loading messages in terminal
+   - Expected: "Loading widgets from registry...", "Successfully registered widget..."
+
+**Next steps**: With the server running, you're ready to test with MCPJam Inspector (Section 8) or connect to ChatGPT (Section 10).
 
 ---
 
@@ -1501,7 +1759,21 @@ npm run dev
 
 This section covers the critical configurations that make widgets render correctly in ChatGPT. These were discovered through troubleshooting and align with the reference implementation.
 
+### Overview
+
+Widgets require specific configurations to render correctly in ChatGPT's sandboxed iframe environment. This section explains the four critical configuration requirements that were discovered through development:
+
+1. **Asset Prefix Configuration**: Making JavaScript files load with absolute URLs
+2. **Event-Driven Reactivity**: Using React 18's `useSyncExternalStore` instead of polling
+3. **MIME Type Specification**: Using `text/html+skybridge` for widget templates
+4. **Complete Metadata**: Including `_meta` fields in resources, tools, and responses
+5. **Simplified Response Format**: Using `structuredContent` at root level (not in nested array)
+
+Each configuration is essential - missing any one will cause widgets to fail in different ways (blank page, frozen loading, JSON display, etc.).
+
 ### Issue 1: JavaScript Assets Not Loading
+
+**Symptom**: Widget iframe loads but shows a blank white page. Browser console shows 404 errors for JavaScript files.
 
 **Problem:** When ChatGPT loads your widget HTML in an iframe, script tags with relative paths like `<script src="/_next/static/chunks/webpack.js">` fail because the browser resolves them relative to `chatgpt.com`, not your server.
 
@@ -1520,9 +1792,11 @@ This section covers the critical configurations that make widgets render correct
 
 ### Issue 2: Data Not Updating Widget
 
-**Problem:** Initial implementations used polling (`setInterval`) to check for `window.openai.toolOutput`, which had timing issues and didn't reliably trigger re-renders.
+**Symptom**: Widget shows "Loading..." forever or displays fallback data instead of tool results. Console shows no errors.
 
-**Solution:** Event-driven reactivity with `useSyncExternalStore` (already implemented in Step 5.8)
+**Root cause**: Old implementations used `setInterval` polling to check for `window.openai.toolOutput`. This has timing issues - the component might check before ChatGPT injects the data, or React might not re-render even when the data changes.
+
+**Solution**: Event-driven reactivity with `useSyncExternalStore` (already implemented in Step 5.8)
 
 **How it works:**
 ```typescript
@@ -1561,9 +1835,11 @@ useSyncExternalStore(
 
 ### Issue 3: MIME Type Must Be Correct
 
-**Problem:** Using `text/html` as the MIME type doesn't signal to ChatGPT that this is a widget template.
+**Symptom**: Widget doesn't render, or displays as plain text/JSON instead of HTML.
 
-**Solution:** Always use `text/html+skybridge`
+**Root cause**: ChatGPT requires a specific MIME type (`text/html+skybridge`) to recognize HTML content as a widget template. Using standard `text/html` causes ChatGPT to treat it as regular content, not a widget.
+
+**Solution**: Always use `text/html+skybridge` in two places
 
 ```typescript
 // WRONG ❌
@@ -1579,9 +1855,11 @@ This appears in two places in `register.ts`:
 
 ### Issue 4: Metadata Must Be Complete
 
-**Problem:** Missing or incorrect `_meta` fields prevent widget rendering.
+**Symptom**: Widget doesn't render, or tool doesn't trigger widget display. May see tool results as text only.
 
-**Solution:** Always include complete metadata in:
+**Root cause**: ChatGPT uses `_meta` fields to understand that a tool should display a widget and which widget template to use. Missing metadata breaks the connection between the tool and its widget.
+
+**Solution**: Always include complete metadata in three places:
 
 1. **Resource registration:**
 ```typescript
@@ -1605,7 +1883,11 @@ return {
 };
 ```
 
-### Response Format (Simplified)
+### Issue 5: Response Format Must Be Simplified
+
+**Symptom**: Tool executes but widget doesn't receive data, or displays JSON as text.
+
+**Root cause**: Older MCP documentation showed a nested array format for widgets. The current implementation uses a simpler format with `structuredContent` at the root level.
 
 **DO NOT use deprecated format:**
 ```typescript
@@ -1646,13 +1928,58 @@ return {
 - ChatGPT knows which widget to render from the tool metadata
 - The `structuredContent` at root level is automatically injected into `window.openai.toolOutput`
 
+### Configuration Checklist
+
+Before testing your widget, verify all five critical configurations:
+
+- [ ] **Asset prefix** configured in `next.config.ts` (returns absolute URLs in development)
+- [ ] **Event-driven reactivity** using `useSyncExternalStore` in widget hook
+- [ ] **MIME type** is `text/html+skybridge` in both resource descriptor and contents
+- [ ] **Complete metadata** in resource registration, tool registration, and tool response
+- [ ] **Simplified response format** with `structuredContent` at root level (not in nested array)
+
+**Verification commands:**
+```bash
+# Check asset URLs are absolute
+curl -s http://localhost:3000/widgets/headphones | grep -o 'src="[^"]*"' | head -3
+
+# Should show:
+# src="http://localhost:3000/_next/static/..." (development)
+# NOT: src="/_next/static/..." (would fail in ChatGPT)
+```
+
 ---
 
 ## 8. Testing with MCPJam Inspector
 
 MCPJam Inspector is a local testing tool that simulates how ChatGPT interacts with your MCP server.
 
+### Overview
+
+Before deploying to ChatGPT, test your MCP server locally with MCPJam Inspector. This tool provides:
+
+- **Visual playground**: Chat interface that calls your MCP tools
+- **Message debugging**: View raw JSON-RPC requests and responses
+- **Server connection**: Test multiple MCP servers simultaneously
+- **Free AI models**: Test without needing ChatGPT Plus
+- **Widget preview**: See how widgets render in an environment similar to ChatGPT
+
+**Testing workflow**:
+1. Set up playground configuration
+2. Launch Inspector and connect to your MCP server
+3. Test widget functionality with natural language prompts
+4. Debug with browser DevTools and Messages tab
+5. Verify widget styling and interactivity
+
+**Why test locally first?**
+- Faster iteration (no deployment required)
+- Better debugging (access to console logs and network tab)
+- Free testing (no ChatGPT Plus needed)
+- Catch issues before production deployment
+
 ### Step 1: Set Up Playground Package
+
+**Purpose**: Create a minimal package with MCPJam Inspector configuration and a launch script.
 
 ```bash
 cd packages/playground
@@ -1673,6 +2000,8 @@ Update `packages/playground/package.json`:
 
 ### Step 2: Create Inspector Configuration
 
+**Purpose**: Define the MCP server connection details so Inspector knows where to send requests.
+
 Create `packages/playground/mcp.config.json`:
 
 ```json
@@ -1686,9 +2015,15 @@ Create `packages/playground/mcp.config.json`:
 }
 ```
 
-**Plain English:** This tells MCPJam Inspector where your MCP server is running.
+**Configuration fields**:
+- **`mcpServers`**: Object containing all MCP servers you want to test
+- **`"TechGear"`**: Display name for this server (shown in Inspector UI)
+- **`url`**: Full URL to your MCP endpoint
+- **`type`**: Transport type (`"http"` for HTTP servers, `"stdio"` for command-line tools)
 
 ### Step 3: Launch Inspector
+
+**Purpose**: Start both the MCP server and MCPJam Inspector to begin testing.
 
 **Terminal 1** (MCP Server):
 ```bash
@@ -1714,13 +2049,29 @@ npm run inspector
 
 ### Step 4: Connect to Your Server
 
-1. **Servers Tab**: You should see "TechGear" listed
-2. Click **Connect** next to TechGear
-3. Wait for green checkmark ✅
+**Purpose**: Establish connection between Inspector and your MCP server to enable tool discovery.
 
-**What's happening:** Inspector is making a request to `http://localhost:3000/mcp` to discover available tools and resources.
+**Steps**:
+1. Open Inspector in your browser (automatically opens)
+2. Navigate to **Servers** tab in the left sidebar
+3. Find "TechGear" in the list
+4. Click **Connect** button
+5. Wait for green checkmark ✅ indicating successful connection
+
+**What happens during connection**:
+- Inspector sends `tools/list` request to your server
+- Inspector sends `resources/list` request to discover widgets
+- Your server responds with available tools and resources
+- Inspector displays discovered capabilities
+
+**Troubleshooting**:
+- **Connection failed**: Ensure MCP server is running (`npm run dev` in Terminal 1)
+- **No tools listed**: Check server logs for widget registration errors
+- **Timeout**: Verify URL in `mcp.config.json` matches your server
 
 ### Step 5: Test in Playground
+
+**Purpose**: Verify that widgets render correctly and respond to natural language queries.
 
 1. Click **Playground** tab
 2. Select a model (or use MCPJam's free models)
@@ -1752,23 +2103,36 @@ Show me midrange headphones for fitness
 
 ### Step 6: Verify in Browser Console
 
-Open browser DevTools (F12) and check the Console:
+**Purpose**: Use browser DevTools to verify that data is flowing correctly from the MCP server to the widget.
 
-**Expected logs:**
+**Steps**:
+1. Open browser DevTools (press F12)
+2. Switch to **Console** tab
+3. Look for widget-related logs
+
+**Expected console output:**
 ```javascript
 [HeadphonesWidget] window.openai available: {toolOutput: {...}}
 [useWidgetProps] window.openai found: {toolOutput: {...}}
 [useWidgetProps] Setting toolOutput: {headphones: [...], summary: "..."}
 ```
 
-**Check widget styling:**
-- ✅ Cards have rounded corners
-- ✅ Cards have shadows
+**Visual verification checklist:**
+- ✅ Cards have rounded corners and shadows
 - ✅ Gradient headers (blue to purple)
-- ✅ Hover effects work
-- ✅ Badges are colored
+- ✅ Hover effects work on cards and buttons
+- ✅ Badges are colored correctly (blue, green, purple)
+- ✅ Layout is responsive and centered
+- ✅ Fonts and spacing look polished
+
+**Common issues**:
+- **No logs**: Widget JavaScript not loading (check asset prefix)
+- **Loading forever**: Data not reaching widget (check `useSyncExternalStore`)
+- **Broken styling**: Tailwind CSS not loaded or conflicting styles
 
 ### Step 7: Debug with Messages Tab
+
+**Purpose**: Examine raw JSON-RPC messages to understand the protocol communication and debug issues.
 
 Click the **Messages** tab to see raw JSON-RPC messages:
 
@@ -1841,9 +2205,50 @@ Click the **Messages** tab to see raw JSON-RPC messages:
 }
 ```
 
+**What to look for in messages**:
+- **Tool call arguments**: Verify AI is passing correct filter values
+- **Tool response structure**: Check `structuredContent` contains expected data
+- **Resource URI**: Confirm matches your widget's `templateUri`
+- **Metadata fields**: Verify all `_meta` fields are present
+- **MIME type**: Must be `text/html+skybridge`
+
+### Testing Summary
+
+Once MCPJam Inspector successfully renders your widget:
+
+✅ **MCP protocol working**: Server correctly handles JSON-RPC requests  
+✅ **Widget registration working**: Tools and resources registered properly  
+✅ **Data flow working**: `structuredContent` reaches `window.openai.toolOutput`  
+✅ **UI working**: React component renders with correct styling  
+✅ **Ready for ChatGPT**: Widget should work the same way in real ChatGPT  
+
+**Next steps**: Deploy your MCP server (Vercel, ngrok, etc.) and connect it to ChatGPT (Section 10).
+
 ---
 
 ## 9. Troubleshooting Widget Rendering
+
+### Overview
+
+This section provides solutions to common widget rendering issues. Each problem includes:
+- **Symptoms**: What you'll see when this issue occurs
+- **Diagnosis**: How to identify the root cause
+- **Solution**: Step-by-step fix instructions
+- **Verification**: How to confirm the issue is resolved
+
+**Common problems**:
+1. Widget shows blank page (asset loading failure)
+2. Widget shows "Loading..." forever (data not updating)
+3. Widget shows JSON instead of HTML (MIME type issue)
+4. Widget shows but data doesn't update (missing metadata)
+5. Tool not being called (unclear tool description)
+
+**General debugging approach**:
+1. Check browser console for errors
+2. Verify MCP server logs for registration issues
+3. Test widget preview page first (`/widgets/headphones`)
+4. Use MCPJam Messages tab to inspect protocol communication
+5. Verify all five critical configurations (Section 7)
 
 ### Problem 1: Widget Shows Blank Page
 
@@ -1973,7 +2378,32 @@ Be explicit about when to use the tool and provide diverse examples.
 
 Once everything works in MCPJam Inspector, test with real ChatGPT.
 
+### Overview
+
+This section guides you through connecting your MCP server to ChatGPT for real-world testing. The process involves:
+
+1. **Expose your server**: Make localhost accessible via HTTPS (ngrok or deployment)
+2. **Enable Developer Mode**: Activate ChatGPT's MCP connector features (requires ChatGPT Plus)
+3. **Add MCP Connector**: Register your server URL in ChatGPT settings
+4. **Test end-to-end**: Verify widgets render correctly in actual ChatGPT conversations
+5. **Monitor server**: Watch logs to debug any issues
+
+**Prerequisites**:
+- ✅ Widget works in MCPJam Inspector (Section 8)
+- ✅ All critical configurations verified (Section 7)
+- ✅ ChatGPT Plus subscription (required for MCP connectors)
+- ✅ Server accessible via HTTPS URL
+
+**Testing workflow**:
+1. Expose server via ngrok or deploy to Vercel
+2. Configure ChatGPT with your MCP endpoint URL
+3. Test with natural language prompts
+4. Verify widget rendering and interactivity
+5. Monitor server logs for errors
+
 ### Step 1: Expose Your Server
+
+**Purpose**: Make your local development server accessible over the internet with HTTPS, which ChatGPT requires for security.
 
 **Option A: ngrok (Easiest)**
 ```bash
@@ -1996,21 +2426,37 @@ vercel deploy
 
 ### Step 2: Enable Developer Mode
 
-1. Open ChatGPT (requires ChatGPT Plus)
-2. Go to **Settings** → **Beta Features**
-3. Enable **Developer Mode**
+**Purpose**: Activate ChatGPT's experimental MCP connector features, which allow connecting to custom MCP servers.
+
+**Steps**:
+1. Open ChatGPT (requires ChatGPT Plus subscription)
+2. Navigate to **Settings** → **Beta Features**
+3. Toggle **Developer Mode** to enabled
+
+**Note**: This feature is in beta and may change. Check OpenAI's documentation for current availability.
 
 ### Step 3: Add MCP Connector
 
-1. In ChatGPT, click **Settings** → **Apps & Connectors**
-2. Click **Add Connector**
-3. Enter details:
-   - **Name:** TechGear
-   - **URL:** `https://your-ngrok-url.ngrok.io/mcp` (or Vercel URL + `/mcp`)
-   - **Type:** HTTP
+**Purpose**: Register your MCP server URL in ChatGPT so it can discover and call your widgets.
+
+**Steps**:
+1. In ChatGPT, open **Settings** → **Apps & Connectors**
+2. Click **Add Connector** button
+3. Fill in connector details:
+   - **Name**: `TechGear` (display name)
+   - **URL**: `https://your-ngrok-url.ngrok.io/mcp` (must include `/mcp` path)
+   - **Type**: `HTTP`
 4. Click **Save**
+5. Wait for connection verification (green checkmark)
+
+**Troubleshooting**:
+- **Connection failed**: Verify URL is accessible and includes `/mcp` path
+- **Invalid response**: Check server logs for errors during connection
+- **Timeout**: Ensure server is running and firewall allows connections
 
 ### Step 4: Test in ChatGPT
+
+**Purpose**: Verify end-to-end functionality with real ChatGPT conversations.
 
 Start a new chat and try:
 
@@ -2031,7 +2477,7 @@ Try more prompts:
 
 ### Step 5: Monitor Your Server
 
-Watch the MCP server logs:
+**Purpose**: Track incoming requests and debug any issues that occur during ChatGPT interaction.
 
 ```bash
 # In packages/mcp terminal
@@ -2051,6 +2497,22 @@ When ChatGPT calls your tool, you'll see HTTP POST requests in the logs.
 ---
 
 ## 11. Key Learnings and Best Practices
+
+### Overview
+
+This section summarizes the key lessons learned during development and provides best practices for building MCP apps. Use this as a reference guide when:
+- Starting new widget projects
+- Troubleshooting existing widgets
+- Optimizing your development workflow
+- Scaling to multiple widgets
+
+**What's covered**:
+- **Architecture lessons**: Patterns that worked well for this project
+- **Critical configurations**: Must-have settings for widget rendering
+- **Development workflow**: Efficient process for building and testing
+- **Debugging tips**: Tools and techniques for troubleshooting
+- **Common mistakes**: Pitfalls to avoid
+- **Scaling guidance**: How to add more widgets efficiently
 
 ### Architecture Lessons
 
