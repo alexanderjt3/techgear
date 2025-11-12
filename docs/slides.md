@@ -112,14 +112,14 @@ ChatGPT apps are built on **tools** - functions that ChatGPT can call
 sequenceDiagram
     participant User
     participant ChatGPT
-    participant Tool Server (MCP)
+    participant ToolServer as Tool Server (MCP)
     participant Widget
     
     User->>ChatGPT: "Show budget headphones"
     ChatGPT->>ChatGPT: Analyze intent
-    ChatGPT->>Tool Server (MCP): call find_headphones(budget)
-    Tool Server (MCP)->>Tool Server (MCP): Filter data
-    Tool Server (MCP)->>ChatGPT: Return results + HTML
+    ChatGPT->>ToolServer: call find_headphones(budget)
+    ToolServer->>ToolServer: Filter data
+    ToolServer->>ChatGPT: Return results + HTML
     ChatGPT->>Widget: Load widget in iframe
     ChatGPT->>Widget: Inject data
     Widget->>User: Display interactive UI
@@ -616,7 +616,7 @@ async function registerWidget(context: WidgetContext): Promise<void> {
 ```mermaid
 graph LR
     A[Widget Package] -->|Import| B[MCP Config]
-    B -->|loadWidgets| C[Tool Server (MCP)]
+    B -->|loadWidgets| C["Tool Server (MCP)"]
     C -->|registerWidget| D[Register Resource]
     D --> E[HTML Template]
     C -->|registerWidget| F[Register Tool]
