@@ -670,77 +670,81 @@ class: text-center
 
 # MCP Server Components
 
-The MCP server has three key parts
+Building the Next.js server that hosts your MCP endpoint
 
-<div class="grid grid-cols-3 gap-6 mt-12">
+<div class="grid grid-cols-3 gap-4 mt-8">
 
-<div v-click="1" class="p-6 bg-purple-500/10 rounded-lg">
+<div v-click="1" class="p-4 bg-blue-500/10 rounded-lg border-2 border-blue-500/30">
 
-### 1️⃣ Widget Registry
-**`mcp.config.ts`**
-
-- Lists all available widgets
-- Enable/disable widgets
-- Configure base paths
-- Environment filtering
+### 1️⃣ MCP.config
+Widget registry
 
 </div>
 
-<div v-click="2" class="p-6 bg-blue-500/10 rounded-lg">
+<div v-click="2" class="p-4 bg-purple-500/10 rounded-lg border-2 border-purple-500/30">
 
-### 2️⃣ MCP Endpoint
-**`/mcp` route**
-
-- Handles JSON-RPC requests
-- Loads enabled widgets
-- Routes tool calls
-- Returns responses
+### 2️⃣ Endpoint
+HTTP route handler
 
 </div>
 
-<div v-click="3" class="p-6 bg-green-500/10 rounded-lg">
+<div v-click="3" class="p-4 bg-green-500/10 rounded-lg border-2 border-green-500/30">
 
-### 3️⃣ Preview Pages
-**`/widgets/*` pages**
-
-- Standalone widget views
-- Testing during development
-- No MCP protocol needed
-- Visual verification
+### 3️⃣ Tooling
+Helpers & Load Widgets
 
 </div>
 
+<div v-click="4" class="p-4 bg-yellow-500/10 rounded-lg border-2 border-yellow-500/30">
+
+### 4️⃣ Next.js Config
+**Critical:** Asset prefix
+
 </div>
 
-<div v-click="4" class="mt-8 text-center text-lg">
-<strong>Plus:</strong> Helper utilities (types, metadata creators, widget loader)
+<div v-click="5" class="p-4 bg-red-500/10 rounded-lg border-2 border-red-500/30">
+
+### 5️⃣ HomePage
+Server info & links
+
+</div>
+
+<div v-click="6" class="p-4 bg-indigo-500/10 rounded-lg border-2 border-indigo-500/30">
+
+### 6️⃣ Widget Page
+Preview & testing
+
+</div>
+
 </div>
 
 ---
 
-# MCP Server: Widget Registry
+# 1️⃣ MCP.config - Widget Registry
 
 Central configuration for all widgets
+
 <style>
 pre, code, .shiki {
   font-size: 0.55rem !important;
-  line-height: 1.2 !important;
+  line-height: 1.3 !important;
 }
 </style>
-```typescript {all|1-9|11-22}
+
+```typescript {all|1|3-10|12-22}
 // mcp.config.ts
 import { headphonesWidgetPackage } from "headphones-widget";
 
 interface WidgetRegistryEntry {
   package: WidgetPackage;
   mcp: {
-    enabled: boolean;      // Toggle on/off
-    production: boolean;   // Include in prod?
-    basePath: string;      // Where to find HTML
+    enabled: boolean;
+    production: boolean;
+    basePath: string;
   };
 }
 
-const config: McpConfig = {
+const config = {
   widgets: {
     headphones: {
       package: headphonesWidgetPackage,
@@ -750,7 +754,6 @@ const config: McpConfig = {
         basePath: "/widgets/headphones",
       },
     },
-    // Add more widgets here without changing server code!
   },
 };
 
@@ -759,14 +762,18 @@ export default config;
 
 ---
 
-# MCP Server: The Endpoint
+# 2️⃣ Endpoint - MCP Route Handler
+
+HTTP route handling JSON-RPC requests
+
 <style>
 pre, code, .shiki {
   font-size: 0.55rem !important;
-  line-height: 1.2 !important;
+  line-height: 1.3 !important;
 }
 </style>
-```typescript {all|1-20|22-28}
+
+```typescript {all|1-3|5-17|19-20}
 // src/app/mcp/route.ts
 import { createMcpHandler } from "mcp-handler";
 import { loadWidgets } from "@/lib/loadWidgets";
@@ -780,75 +787,94 @@ const handler = createMcpHandler(async (server) => {
     },
     getHtml: async (path: string) => {
       const baseURL = getBaseURL();
-      const result = await fetch(`${baseURL}${path}`, {
-        cache: "no-store",
-      });
-      return await result.text();
+      return await fetch(`${baseURL}${path}`).then(r => r.text());
     },
   };
-
-  // Load all enabled widgets from config
-  await loadWidgets(context);
+  
+  await loadWidgets(context);  // Load all widgets
 });
 
-// Export both GET and POST
-// ChatGPT uses POST, GET for health checks
 export const GET = handler;
 export const POST = handler;
 ```
 
 ---
 
-# Critical Configuration: Asset Prefix
+# 3️⃣ Tooling - Helpers & Load Widgets
 
-<div class="grid grid-cols-2 gap-6">
+Utilities that power the MCP server
+
+<div class="grid grid-cols-2 gap-6 mt-8">
 
 <div>
 
-## The Problem
+### Metadata Helpers
 
-When ChatGPT loads your widget in an iframe:
+<style>
+pre, code, .shiki {
+  font-size: 0.5rem !important;
+  line-height: 1.2 !important;
+}
+</style>
 
-```html
-<!-- Your widget HTML -->
-<script src="/_next/static/chunks/main.js"></script>
+```typescript
+// src/lib/helpers.ts
+
+// Create resource metadata
+export function createResourceMeta(
+  description: string,
+  prefersBorder: boolean
+) {
+  return {
+    "openai/widgetDescription": description,
+    "openai/widgetPrefersBorder": prefersBorder,
+  };
+}
+
+// Create widget metadata
+export function createWidgetMeta(
+  metadata: WidgetMetadata
+) {
+  return {
+    "openai/outputTemplate": metadata.templateUri,
+    "openai/toolInvocation/invoking": metadata.invoking,
+    "openai/toolInvocation/invoked": metadata.invoked,
+  };
+}
 ```
-
-Browser resolves relative to `chatgpt.com`:
-```
-https://chatgpt.com/_next/static/chunks/main.js
-```
-
-**Result:** ❌ 404 Error - Blank widget
 
 </div>
 
 <div v-click>
 
-## The Solution
+### Widget Loader
 
-```typescript {all|1-7|9-12}
-// next.config.ts
-function getAssetPrefix(): string {
-  if (process.env.NODE_ENV === "development") {
-    const port = process.env.PORT || 3000;
-    return `http://localhost:${port}`;
+```typescript
+// src/lib/loadWidgets.ts
+
+export async function loadWidgets(
+  context: Omit<WidgetContext, "basePath">
+) {
+  const { logger } = context;
+  
+  // Filter enabled widgets
+  const enabledWidgets = Object.entries(
+    WIDGET_REGISTRY
+  ).filter(([, entry]) => entry.mcp.enabled);
+  
+  // Register each widget
+  for (const [widgetId, entry] of enabledWidgets) {
+    const widgetContext = {
+      ...context,
+      basePath: entry.mcp.basePath,
+    };
+    
+    await entry.package.registerWidget(
+      widgetContext
+    );
   }
-  return ""; // Relative in production
 }
-
-const nextConfig: NextConfig = {
-  assetPrefix: getAssetPrefix(), // ⚡ Critical!
-  transpilePackages: ["headphones-widget"],
-};
 ```
-
-Now scripts load:
-```
-http://localhost:3000/_next/static/chunks/main.js
-```
-
-**Result:** ✅ Widget works!
 
 </div>
 
@@ -856,126 +882,306 @@ http://localhost:3000/_next/static/chunks/main.js
 
 ---
 
-# Critical Configurations Checklist
+# 4️⃣ Next.js Config - Critical Setup
 
-<v-clicks>
+⚡ **CRITICAL** for widget rendering in ChatGPT
 
-## 1️⃣ Asset Prefix
-```typescript
-assetPrefix: getBaseURL() // Absolute URLs in development
+<style>
+pre, code, .shiki {
+  font-size: 0.55rem !important;
+  line-height: 1.3 !important;
+}
+</style>
+
+```typescript {all|4-11|13-16}
+// next.config.ts
+import type { NextConfig } from "next";
+
+// Makes script URLs absolute in development
+function getAssetPrefix(): string {
+  if (process.env.NODE_ENV === "development") {
+    const port = process.env.PORT || 3000;
+    return `http://localhost:${port}`;
+  }
+  return "";
+}
+
+const nextConfig: NextConfig = {
+  assetPrefix: getAssetPrefix(),              // ⚡ CRITICAL!
+  transpilePackages: ["headphones-widget"],
+  output: "standalone",
+};
+
+export default nextConfig;
 ```
 
-## 2️⃣ Event-Driven Reactivity
-```typescript
-useSyncExternalStore(...) // Not setInterval polling
+<div v-click class="mt-4 p-4 bg-red-500/10 rounded border-2 border-red-500/30">
+<strong>Without this:</strong> Blank pages in ChatGPT! Scripts try to load from chatgpt.com instead of your server.
+</div>
+
+---
+
+# 5️⃣ HomePage - Server Info
+
+Landing page with server information
+
+<style>
+pre, code, .shiki {
+  font-size: 0.6rem !important;
+  line-height: 1.4 !important;
+}
+</style>
+
+```tsx
+// src/app/page.tsx
+import Link from "next/link";
+
+export default function HomePage() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50">
+      <div className="max-w-4xl mx-auto p-8">
+        <h1 className="text-4xl font-bold">TechGear MCP Server</h1>
+        <p className="text-xl mt-4">ChatGPT App Development</p>
+        
+        <div className="mt-8 space-y-4">
+          <h2 className="text-2xl font-semibold">Available Widgets</h2>
+          <Link href="/widgets/headphones">
+            🎧 Headphones Widget Preview
+          </Link>
+        </div>
+        
+        <div className="mt-8">
+          <h2 className="text-2xl font-semibold">Endpoints</h2>
+          <p className="mt-2">MCP Endpoint: <code>/mcp</code></p>
+        </div>
+      </div>
+    </div>
+  );
+}
 ```
 
-## 3️⃣ MIME Type
-```typescript
-mimeType: "text/html+skybridge" // Not just "text/html"
+---
+
+# 6️⃣ Widget Page - Preview & Testing
+
+Test widgets without MCP protocol
+
+<style>
+pre, code, .shiki {
+  font-size: 0.6rem !important;
+  line-height: 1.4 !important;
+}
+</style>
+
+```tsx
+// src/app/widgets/headphones/page.tsx
+"use client";
+import { HeadphonesWidget } from "headphones-widget";
+
+export default function HeadphonesWidgetPage() {
+  return <HeadphonesWidget />;
+}
 ```
 
-## 4️⃣ Complete Metadata
+<div class="mt-8 grid grid-cols-2 gap-6">
+
+<div v-click>
+
+### 🎯 Benefits
+- Fast visual testing
+- No MCP overhead
+- Debug styling easily
+- Immediate feedback
+
+</div>
+
+<div v-click>
+
+### 📍 Access
+Visit: `localhost:3000/widgets/headphones`
+
+Shows widget with fallback data
+
+</div>
+
+</div>
+
+---
+
+# Import Widget Config
+
+How the server imports your widget
+
+<style>
+pre, code, .shiki {
+  font-size: 0.6rem !important;
+  line-height: 1.4 !important;
+}
+</style>
+
+<div class="grid grid-cols-2 gap-6 mt-6">
+
+<div>
+
+### Widget Exports
+
 ```typescript
-_meta: createWidgetMeta(...) // In resource, tool, and response
+// headphones-widget/src/index.ts
+
+export const headphonesWidgetPackage = {
+  config: {
+    id: "headphones",
+    name: "Headphones Widget"
+  },
+  registerWidget: async (context) => {
+    // Register tools & resources
+  }
+};
 ```
 
-## 5️⃣ Simplified Response Format
+</div>
+
+<div v-click>
+
+### Server Imports
+
 ```typescript
-{ content: [...], structuredContent: {...}, _meta: {...} }
+// mcp.config.ts
+
+import { 
+  headphonesWidgetPackage 
+} from "headphones-widget";
+
+const config = {
+  widgets: {
+    headphones: {
+      package: headphonesWidgetPackage,
+      mcp: { ... }
+    }
+  }
+};
 ```
 
-</v-clicks>
+</div>
+
+</div>
+
+<div v-click class="mt-8 p-4 bg-blue-500/10 rounded">
+
+The `loadWidgets()` function reads this config and calls each widget's `registerWidget()` method
+
+</div>
+
+---
+
+# That's All You Need! 
+
+<div class="mt-8 text-center">
+
+## The MCP Server Does 3 Things:
+
+<div class="grid grid-cols-3 gap-8 mt-12">
+
+<div v-click="1" class="p-8 bg-blue-500/20 rounded-lg">
+
+### 1. Import
+```typescript
+import { widget }
+from "headphones-widget"
+```
+
+</div>
+
+<div v-click="2" class="p-8 bg-purple-500/20 rounded-lg">
+
+### 2. Configure
+```typescript
+widgets: {
+  headphones: { ... }
+}
+```
+
+</div>
+
+<div v-click="3" class="p-8 bg-green-500/20 rounded-lg">
+
+### 3. Load
+```typescript
+await loadWidgets()
+```
+
+</div>
+
+</div>
+
+</div>
+
+<div v-click class="mt-12 p-6 bg-green-500/10 rounded-lg border-2 border-green-500/30 text-center">
+
+### ✨ No tool logic, no UI code, no business rules in the server!
+
+Everything lives in the widget package.
+
+</div>
 
 ---
 layout: center
 class: text-center
 ---
 
-# Testing Your Widget
+# 🧪 Testing with MCPJam
 
-## Three Testing Stages
+## Test Locally Before Deploying
 
-<div class="mt-12 grid grid-cols-3 gap-8">
-  <div class="p-6 bg-blue-500/20 rounded-lg">
-    <div class="text-4xl mb-4">🌐</div>
-    <h3 class="text-xl font-bold mb-2">Stage 1</h3>
-    <p>Preview Page</p>
-    <code class="text-sm">localhost:3000/widgets/headphones</code>
-  </div>
-  
-  <div class="p-6 bg-purple-500/20 rounded-lg">
-    <div class="text-4xl mb-4">🔍</div>
-    <h3 class="text-xl font-bold mb-2">Stage 2</h3>
-    <p>MCPJam Inspector</p>
-    <code class="text-sm">Local MCP testing</code>
-  </div>
-  
-  <div class="p-6 bg-green-500/20 rounded-lg">
-    <div class="text-4xl mb-4">🤖</div>
-    <h3 class="text-xl font-bold mb-2">Stage 3</h3>
-    <p>Real ChatGPT</p>
-    <code class="text-sm">Production testing</code>
-  </div>
+<div class="mt-8 grid grid-cols-2 gap-8">
+
+<div v-click>
+
+### Why MCPJam Inspector?
+- 🔌 Connects to local MCP server
+- 💬 Chat interface for testing
+- 🔍 JSON-RPC message debugger
+- 🎨 Widget preview
+- 🆓 Free AI models included
+- ⚡ Fast iteration cycle
+
+</div>
+
+<div v-click>
+
+### Testing Workflow
+1. Start MCP server locally
+2. Launch MCPJam Inspector
+3. Connect to your server
+4. Test with natural language
+5. Debug with message viewer
+6. Iterate quickly
+
+</div>
+
 </div>
 
 ---
 
-# Stage 1: Preview Page Testing
+# Setup MCPJam Inspector
 
-Quick visual verification without MCP protocol
+Quick setup in 2 steps
 
-```bash
-# Terminal 1: Start MCP server
-cd packages/mcp
-npm run dev
-
-# Open browser: http://localhost:3000/widgets/headphones
-```
-
-<div class="mt-6">
-
-## What to Check
-
-<v-clicks>
-
-- ✅ Widget renders without errors
-- ✅ Styling looks correct (Tailwind CSS loaded)
-- ✅ Components display properly
-- ✅ No console errors
-- ✅ Responsive layout works
-
-</v-clicks>
-
-</div>
-
-<div v-click class="mt-6 p-4 bg-yellow-500/10 rounded">
-<strong>Note:</strong> Widget will show loading state or fallback data since window.openai isn't available outside ChatGPT
-</div>
-
----
-
-# Stage 2: MCPJam Inspector
-
-Test the full MCP protocol locally
-
-```bash
-# Terminal 1: MCP Server
-cd packages/mcp
-npm run dev
-
-# Terminal 2: Inspector
-cd packages/playground
-npm run inspector
-```
-
-<div class="mt-6 grid grid-cols-2 gap-6">
+<div class="grid grid-cols-2 gap-8 mt-8">
 
 <div>
 
-## Setup
+### 1. Configuration
 
-1. Create `mcp.config.json`:
+Create `packages/playground/mcp.config.json`:
+
+<style>
+pre, code, .shiki {
+  font-size: 0.55rem !important;
+  line-height: 1.3 !important;
+}
+</style>
+
 ```json
 {
   "mcpServers": {
@@ -987,28 +1193,27 @@ npm run inspector
 }
 ```
 
-2. Open Inspector (auto-opens)
-3. Click **Servers** → Connect
-4. Go to **Playground** tab
-
 </div>
 
-<div>
+<div v-click>
 
-## Test Queries
+### 2. Launch Both
 
+```bash
+# Terminal 1: MCP server
+cd packages/mcp
+npm run dev
+
+# Terminal 2: Inspector
+cd packages/playground
+npm run inspector
 ```
-Show me headphones
-```
-```
-Find budget headphones
-```
-```
-I need gaming headphones
-```
-```
-Show midrange fitness headphones
-```
+
+<div class="mt-4 p-3 bg-blue-500/10 rounded">
+
+Inspector opens at: `http://127.0.0.1:6274`
+
+</div>
 
 </div>
 
@@ -1016,18 +1221,68 @@ Show midrange fitness headphones
 
 ---
 
-# Inspector Debugging Tools
+# Testing in Inspector
 
-<div class="grid grid-cols-2 gap-6">
+<div class="grid grid-cols-2 gap-8 mt-8">
 
 <div>
 
-## Messages Tab
+### Connect to Server
 
-See raw JSON-RPC communication
+1. Click **Servers** tab
+2. Find "TechGear"
+3. Click **Connect**
+4. Wait for ✅ green checkmark
+5. Go to **Playground** tab
+
+</div>
+
+<div v-click>
+
+### Test with Prompts
+
+```
+Show me headphones
+```
+
+```
+Find budget headphones for gaming
+```
+
+```
+I need over-ear headphones for commuting
+```
+
+<div class="mt-4 p-3 bg-green-500/10 rounded">
+
+✅ Widget renders with filtered results
+
+</div>
+
+</div>
+
+</div>
+
+---
+
+# Debugging Tools
+
+<div class="grid grid-cols-2 gap-8 mt-8">
+
+<div>
+
+### Messages Tab
+View raw JSON-RPC protocol
+
+<style>
+pre, code, .shiki {
+  font-size: 0.45rem !important;
+  line-height: 1.1 !important;
+}
+</style>
 
 ```json
-// Request
+// Tool call request
 {
   "method": "tools/call",
   "params": {
@@ -1038,188 +1293,36 @@ See raw JSON-RPC communication
   }
 }
 
-// Response
+// Tool response
 {
-  "result": {
-    "content": [...],
-    "structuredContent": {
-      "headphones": [...]
-    },
-    "_meta": {...}
+  "structuredContent": {
+    "headphones": [...]
+  },
+  "_meta": {
+    "openai/outputTemplate": "ui://..."
   }
 }
 ```
 
 </div>
 
-<div>
+<div v-click>
 
-## Browser DevTools
+### Browser DevTools (F12)
 
-Press F12 and check:
-
-**Console Tab:**
-```javascript
-window.openai
-// {toolOutput: {...}, maxHeight: 600}
-```
-
-**Network Tab:**
-- Verify assets load (200 status)
-- Check absolute URLs
-- No 404 errors
-
-**Elements Tab:**
-- Inspect widget HTML
-- Verify styling applied
-- Check iframe structure
-
-</div>
-
-</div>
-
----
-
-# Stage 3: ChatGPT Testing
-
-Real-world testing with actual ChatGPT
-
-<div class="grid grid-cols-2 gap-6 mt-6">
-
-<div>
-
-## Setup Steps
-
-1. **Expose server:**
-```bash
-ngrok http 3000
-# Or deploy to Vercel
-```
-
-2. **Enable Developer Mode:**
-   - ChatGPT Settings
-   - Beta Features
-   - Toggle Developer Mode
-
-3. **Add Connector:**
-   - Settings → Apps & Connectors
-   - Add Connector
-   - URL: `https://your-url.ngrok.io/mcp`
-
-4. **Test:**
-   - Start new chat
-   - "Show me headphones"
-
-</div>
-
-<div>
-
-## What to Verify
-
-<v-clicks>
-
-- ✅ Tool gets called by ChatGPT
-- ✅ Widget iframe loads
-- ✅ Data appears in widget
-- ✅ Styling is correct
-- ✅ Interactive elements work
-- ✅ No console errors
-- ✅ Status messages appear
-  - "Finding headphones..."
-  - "Headphones loaded"
-
-</v-clicks>
-
-</div>
-
-</div>
-
----
-
-# Common Issues & Solutions
-
-<div class="grid grid-cols-2 gap-6">
-
-<div>
-
-## 🐛 Blank Widget
-
-**Symptom:** Widget shows nothing
-
-**Cause:** Asset prefix missing
-
-**Fix:**
-```typescript
-// next.config.ts
-assetPrefix: getAssetPrefix()
-```
-
-Verify:
-```bash
-curl -s http://localhost:3000/widgets/headphones \
-  | grep -o 'src="[^"]*"' | head -3
-```
-
-Should show absolute URLs
-
-</div>
-
-<div>
-
-## 🐛 Loading Forever
-
-**Symptom:** Stuck on loading state
-
-**Cause:** Data not reaching widget
-
-**Fix:**
-```typescript
-// Use useSyncExternalStore
-// Not setInterval polling
-```
-
-Check console:
+**Console Tab**
 ```javascript
 window.openai?.toolOutput
-// Should have data
 ```
 
-</div>
+**Network Tab**
+- Check asset loading (200 OK)
+- Verify absolute URLs
+- Look for 404 errors
 
-</div>
-
-<div class="mt-6 grid grid-cols-2 gap-6">
-
-<div>
-
-## 🐛 Shows JSON
-
-**Symptom:** Raw JSON displayed
-
-**Cause:** Wrong MIME type
-
-**Fix:**
-```typescript
-mimeType: "text/html+skybridge"
-// Not "text/html"
-```
-
-</div>
-
-<div>
-
-## 🐛 Tool Not Called
-
-**Symptom:** ChatGPT doesn't call tool
-
-**Cause:** Unclear description
-
-**Fix:** Add explicit examples:
-```typescript
-"Examples:
-- 'Show me budget headphones'
-- 'Find gaming headphones'"
-```
+**Elements Tab**
+- Inspect HTML structure
+- Check Tailwind classes
 
 </div>
 
@@ -1227,250 +1330,166 @@ mimeType: "text/html+skybridge"
 
 ---
 
-# Development Workflow
+# Success Checklist
 
-<div class="grid grid-cols-2 gap-8">
-
-<div>
-
-## Daily Development
-
-```bash
-# 1. Build widget
-cd packages/widgets/headphones-widget
-npm run build
-
-# 2. Start MCP server
-cd ../../mcp
-npm run dev
-
-# 3. Test preview page
-open http://localhost:3000/widgets/headphones
-
-# 4. Test with Inspector
-cd ../playground
-npm run inspector
-
-# 5. Make changes → Repeat
-```
-
-</div>
-
-<div>
-
-## Quick Iteration
-
-<v-clicks>
-
-### For Widget Changes:
-1. Edit widget code
-2. `npm run build` in widget folder
-3. Restart MCP server (Ctrl+C, npm run dev)
-4. Refresh browser
-
-### For Server Changes:
-1. Edit server code
-2. Next.js auto-reloads
-3. Refresh browser
-
-### For Config Changes:
-1. Edit `mcp.config.ts`
-2. Restart MCP server
-3. Reconnect in Inspector
-
-</v-clicks>
-
-</div>
-
-</div>
-
----
-
-# Best Practices
-
-<div class="grid grid-cols-2 gap-6">
-
-<div>
-
-## Architecture
-
-<v-clicks>
-
-- ✅ Keep widgets self-contained
-- ✅ Use TypeScript everywhere
-- ✅ Validate with Zod
-- ✅ Centralize configuration
-- ✅ Log errors clearly
-- ✅ Handle edge cases
-
-</v-clicks>
-
-</div>
-
-<div>
-
-## Development
-
-<v-clicks>
-
-- ✅ Test incrementally
-- ✅ Use browser DevTools
-- ✅ Check Messages tab
-- ✅ Monitor server logs
-- ✅ Preview page first
-- ✅ Inspector before ChatGPT
-
-</v-clicks>
-
-</div>
-
-</div>
+Verify everything works before deploying
 
 <div class="mt-8 grid grid-cols-2 gap-6">
 
 <div>
 
-## Code Quality
+### ✅ Server Connection
+- Green checkmark on connect
+- Tools listed correctly
+- Resources discovered
 
-<v-clicks>
-
-- ✅ Write descriptive prompts
-- ✅ Add code comments
-- ✅ Handle loading states
-- ✅ Show error messages
-- ✅ Responsive design
-
-</v-clicks>
+### ✅ Widget Rendering
+- HTML loads in iframe
+- Tailwind CSS applied
+- No console errors
 
 </div>
 
-<div>
+<div v-click>
 
-## Scaling
+### ✅ Data Flow
+- Tool receives correct params
+- `structuredContent` present
+- Widget shows filtered data
 
-<v-clicks>
-
-- ✅ Add widgets via config
-- ✅ Reuse hooks (useOpenAI)
-- ✅ Share utilities
-- ✅ Isolate errors
-- ✅ Environment filtering
-
-</v-clicks>
-
-</div>
-
-</div>
-
----
-
-# Scaling to Multiple Widgets
-
-<div class="mt-6">
-
-## Adding a New Widget
-
-```typescript {all|1-8|10-20|22-25}
-// 1. Create widget package
-packages/widgets/speakers-widget/
-  └── src/
-      ├── components/SpeakersWidget.tsx
-      ├── data/speakers.ts
-      ├── semantic/contracts.ts
-      └── register.ts
-
-// 2. Add to mcp.config.ts
-import { speakersWidgetPackage } from "speakers-widget";
-
-const config: McpConfig = {
-  widgets: {
-    headphones: { /* existing */ },
-    speakers: {  // ⬅️ New widget
-      package: speakersWidgetPackage,
-      mcp: {
-        enabled: true,
-        production: true,
-        basePath: "/widgets/speakers",
-      },
-    },
-  },
-};
-
-// 3. Create preview page
-// src/app/widgets/speakers/page.tsx
-
-// 4. Build and test!
-```
-
-**That's it!** No server code changes needed.
-
-</div>
-
----
-
-# Key Takeaways
-
-<v-clicks depth="2">
-
-## 🎯 MCP enables rich ChatGPT integrations
-- Natural language → Tool calls
-- Dynamic UI rendering
-- Conversational interactions
-
-## 🏗️ Architecture is simple but powerful
-- Widget packages (React + logic)
-- MCP server (Next.js)
-- Config-driven loading
-
-## 🔧 Critical configurations matter
-- Asset prefix for iframe loading
-- Event-driven reactivity
+### ✅ Protocol
+- Valid JSON-RPC messages
 - Correct MIME types
-- Complete metadata
+- Metadata complete
 
-## 🧪 Test incrementally
-- Preview → Inspector → ChatGPT
-- Debug early, debug often
+</div>
 
-## 📈 Scales easily
-- Add widgets via configuration
-- Reuse patterns and utilities
-- Isolated error handling
+</div>
 
-</v-clicks>
+<div v-click class="mt-8 p-6 bg-green-500/10 rounded-lg border-2 border-green-500/30 text-center">
+
+### 🎉 All checks pass? Your MCP server is ready for ChatGPT!
+
+</div>
+
+---
+layout: center
+class: text-center
+---
+
+# What You've Learned
+
+<div class="grid grid-cols-3 gap-8 mt-12">
+
+<div v-click="1" class="p-6 bg-blue-500/20 rounded-lg">
+
+### Widget Package
+Self-contained logic  
+Zod validation  
+React components  
+MCP registration
+
+</div>
+
+<div v-click="2" class="p-6 bg-purple-500/20 rounded-lg">
+
+### MCP Server
+Widget registry  
+Dynamic loading  
+JSON-RPC endpoint  
+Asset configuration
+
+</div>
+
+<div v-click="3" class="p-6 bg-green-500/20 rounded-lg">
+
+### Testing Flow
+Preview pages  
+MCPJam Inspector  
+Browser DevTools  
+Production ready
+
+</div>
+
+</div>
 
 ---
 
-# Resources
+# Critical Configurations
 
-<div class="grid grid-cols-2 gap-8 mt-8">
+The 5 must-have settings for widgets
+
+<div class="mt-8 grid grid-cols-1 gap-4">
+
+<div v-click class="p-4 bg-red-500/10 rounded-lg border-l-4 border-red-500">
+
+**1. Asset Prefix** → `assetPrefix: getAssetPrefix()` in next.config.ts
+
+</div>
+
+<div v-click class="p-4 bg-orange-500/10 rounded-lg border-l-4 border-orange-500">
+
+**2. Event-Driven Hook** → `useSyncExternalStore` not polling
+
+</div>
+
+<div v-click class="p-4 bg-yellow-500/10 rounded-lg border-l-4 border-yellow-500">
+
+**3. MIME Type** → `text/html+skybridge` not `text/html`
+
+</div>
+
+<div v-click class="p-4 bg-green-500/10 rounded-lg border-l-4 border-green-500">
+
+**4. Complete Metadata** → `_meta` in resource, tool, response
+
+</div>
+
+<div v-click class="p-4 bg-blue-500/10 rounded-lg border-l-4 border-blue-500">
+
+**5. Response Format** → `structuredContent` at root level
+
+</div>
+
+</div>
+
+---
+
+# Next Steps
+
+Your path to building ChatGPT apps
+
+<div class="mt-8 grid grid-cols-2 gap-8">
 
 <div>
 
-## Documentation
+### Getting Started
 
+<v-clicks>
+
+1. 📥 Clone the TechGear repo
+2. 📖 Read DEVELOPER_GUIDE.md
+3. 🏗️ Build your first widget
+4. 🧪 Test with MCPJam
+5. 🚀 Deploy to ChatGPT
+
+</v-clicks>
+
+</div>
+
+<div v-click>
+
+### Resources
+
+**Documentation**
 - [OpenAI Apps SDK](https://developers.openai.com/apps-sdk)
 - [MCP Specification](https://spec.modelcontextprotocol.io/)
 - [MCPJam Inspector](https://docs.mcpjam.com/)
-- [Next.js Documentation](https://nextjs.org/docs)
-- [React useSyncExternalStore](https://react.dev/reference/react/useSyncExternalStore)
 
-</div>
-
-<div>
-
-## TechGear Project
-
-```bash
-techgear/
-├── DEVELOPER_GUIDE.md    # Full guide
-├── QUICK_REFERENCE.md    # Quick lookups
-├── docs/                 # This presentation
-└── packages/
-    ├── mcp/              # Server code
-    ├── widgets/          # Widget packages
-    └── playground/       # Testing setup
-```
+**TechGear Files**
+- `DEVELOPER_GUIDE.md`
+- `QUICK_REFERENCE.md`
+- `SLIDES_CHEATSHEET.md`
 
 </div>
 
@@ -1481,25 +1500,41 @@ layout: center
 class: text-center
 ---
 
-# Thank You! 🚀
+# 🚀 You're Ready!
 
-## Start Building Your ChatGPT App
+<div class="mt-12 text-2xl">
 
-<div class="mt-12">
-
-### Next Steps
-
-1. Clone the TechGear repo
-2. Follow the Developer Guide
-3. Build your first widget
-4. Test with MCPJam Inspector
-5. Deploy to ChatGPT!
+You now know how to build ChatGPT apps with MCP
 
 </div>
 
-<div class="mt-12">
+<div class="mt-12 grid grid-cols-2 gap-8 max-w-4xl mx-auto">
 
-**Questions?** Check the docs or experiment with the code!
+<div v-click class="p-6 bg-blue-500/20 rounded-lg">
+
+### What You Built
+✅ Widget package  
+✅ MCP server  
+✅ Testing workflow  
+✅ Production-ready app
+
+</div>
+
+<div v-click class="p-6 bg-purple-500/20 rounded-lg">
+
+### What You Learned
+✅ MCP protocol  
+✅ Event-driven hooks  
+✅ Dynamic loading  
+✅ Critical configs
+
+</div>
+
+</div>
+
+<div v-click class="mt-12 text-3xl font-bold">
+
+**Go build something amazing!** 🎉
 
 </div>
 
@@ -1507,5 +1542,18 @@ class: text-center
 layout: end
 ---
 
-# Happy Building! 🎉
+# Thank You!
 
+### Building ChatGPT Apps with MCP
+
+<div class="mt-12 text-xl opacity-75">
+
+Questions? Check `DEVELOPER_GUIDE.md`
+
+</div>
+
+<div class="mt-8 text-base opacity-50">
+
+TechGear - An educational guide to the Model Context Protocol
+
+</div>
