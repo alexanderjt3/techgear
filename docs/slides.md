@@ -370,7 +370,12 @@ export type Headphone = z.infer<typeof HeadphoneContract>;
 # Step 3: ChatGPT Integration
 
 The critical hook that receives data from ChatGPT
-
+<style>
+pre, code, .shiki {
+  font-size: 0.55rem !important;
+  line-height: 1.2 !important;
+}
+</style>
 ```typescript {all|1-5|7-21|23-30}
 // src/hooks/useOpenAI.ts
 import { useSyncExternalStore } from "react";
@@ -406,70 +411,15 @@ export function useWidgetProps<T>(defaultState?: T): T | null {
 
 ---
 
-# Why Event-Driven Reactivity?
-
-<div class="grid grid-cols-2 gap-6">
-
-<div>
-
-## ❌ Old Way: Polling
-
-```typescript
-useEffect(() => {
-  const intervalId = setInterval(() => {
-    if (window.openai?.toolOutput) {
-      setData(window.openai.toolOutput);
-    }
-  }, 1000); // Check every second
-  
-  return () => clearInterval(intervalId);
-}, []);
-```
-
-**Problems:**
-- 🐌 1 second delay
-- 🔥 Wastes CPU cycles
-- 🐛 Timing issues
-- 🚫 Not React 18 compliant
-
-</div>
-
-<div>
-
-## ✅ New Way: Events
-
-```typescript
-useSyncExternalStore(
-  (onChange) => {
-    window.addEventListener(
-      "openai:set_globals", 
-      onChange
-    );
-    return () => window.removeEventListener(
-      "openai:set_globals", 
-      onChange
-    );
-  },
-  () => window.openai?.toolOutput
-);
-```
-
-**Benefits:**
-- ⚡ Immediate response
-- 💚 Zero polling overhead
-- ✅ React 18+ best practice
-- 🎯 Official OpenAI pattern
-
-</div>
-
-</div>
-
----
-
 # Step 4: React Component
 
 Build the UI that renders in ChatGPT
-
+<style>
+pre, code, .shiki {
+  font-size: 0.55rem !important;
+  line-height: 1.2 !important;
+}
+</style>
 ```typescript {all|1-8|10-16|18-30}
 // src/components/HeadphonesWidget.tsx
 "use client";
@@ -508,7 +458,12 @@ export function HeadphonesWidget({ fallbackData }: HeadphonesWidgetProps) {
 # Step 5: AI-Facing Descriptions
 
 Teach ChatGPT when and how to use your tool
-
+<style>
+pre, code, .shiki {
+  font-size: 0.55rem !important;
+  line-height: 1.2 !important;
+}
+</style>
 ```typescript {all|1-15|17-20}
 // src/semantic/prompts.ts
 export const headphonesWidgetPrompts = {
@@ -538,11 +493,18 @@ Filters: priceBracket (budget/midrange/premium), activity (commuting/gaming/stud
 
 ---
 
-# Step 6: MCP Registration
+# Step 6a: MCP Registration - Resource
 
-Connect your widget to the MCP server
+Register the HTML template with the MCP server
 
-```typescript {all|1-15|17-30|32-42}
+<style>
+pre, code, .shiki {
+  font-size: 0.55rem !important;
+  line-height: 1.2 !important;
+}
+</style>
+
+```typescript {all|1-6|8-25}
 // src/register.ts
 async function registerWidget(context: WidgetContext): Promise<void> {
   const { server, logger, getHtml, basePath } = context;
@@ -552,11 +514,11 @@ async function registerWidget(context: WidgetContext): Promise<void> {
   
   // STEP 1: Register HTML resource
   server.registerResource(
-    "headphones-widget",
+    "headphones-widget",                    // Resource name
     "ui://widget/headphones-template.html", // Template URI
     {
       title: headphonesWidgetPrompts.resourceTitle,
-      mimeType: "text/html+skybridge", // CRITICAL!
+      mimeType: "text/html+skybridge",      // CRITICAL!
       _meta: createResourceMeta(
         headphonesWidgetPrompts.widgetDescription,
         true // prefersBorder
@@ -570,27 +532,58 @@ async function registerWidget(context: WidgetContext): Promise<void> {
       }],
     })
   );
+  // ... tool registration next
+}
+```
+
+<div v-click class="mt-4 p-3 bg-blue-500/10 rounded">
+<strong>Key:</strong> The resource registration makes the widget HTML available to ChatGPT. The <code>mimeType</code> must be <code>text/html+skybridge</code>!
+</div>
+
+---
+
+# Step 6b: MCP Registration - Tool
+
+Register the tool that ChatGPT can call
+
+<style>
+pre, code, .shiki {
+  font-size: 0.55rem !important;
+  line-height: 1.2 !important;
+}
+</style>
+
+```typescript {all|1-10|12-20}
+// src/register.ts (continued)
+async function registerWidget(context: WidgetContext): Promise<void> {
+  // ... resource registration above
   
   // STEP 2: Register tool
   server.registerTool(
-    "find_headphones",
+    "find_headphones",                      // Tool name (what ChatGPT calls)
     {
       title: headphonesWidgetPrompts.toolTitle,
       description: headphonesWidgetPrompts.toolDescription,
       inputSchema: FindHeadphonesToolInputContract.shape,
-      _meta: createWidgetMeta(headphonesWidgetMetadata),
+      _meta: createWidgetMeta(headphonesWidgetMetadata), // Links to widget
     },
     async (input) => {
+      // Filter headphones based on input
       const headphones = filterHeadphones(input.priceBracket, input.activity);
+      
       return {
         content: [{ type: "text", text: "Found headphones" }],
-        structuredContent: { headphones },
+        structuredContent: { headphones },     // Becomes window.openai.toolOutput
         _meta: createWidgetMeta(headphonesWidgetMetadata),
       };
     }
   );
 }
 ```
+
+<div v-click class="mt-4 p-3 bg-purple-500/10 rounded">
+<strong>Key:</strong> The <code>_meta</code> field links the tool to the widget template. The <code>structuredContent</code> becomes <code>window.openai.toolOutput</code>.
+</div>
 
 ---
 
@@ -622,7 +615,12 @@ graph LR
 # Widget Package Exports
 
 Create a clean public API
-
+<style>
+pre, code, .shiki {
+  font-size: 0.55rem !important;
+  line-height: 1.2 !important;
+}
+</style>
 ```typescript
 // src/index.ts - Public exports
 
@@ -670,10 +668,65 @@ class: text-center
 
 ---
 
+# MCP Server Components
+
+The MCP server has three key parts
+
+<div class="grid grid-cols-3 gap-6 mt-12">
+
+<div v-click="1" class="p-6 bg-purple-500/10 rounded-lg">
+
+### 1️⃣ Widget Registry
+**`mcp.config.ts`**
+
+- Lists all available widgets
+- Enable/disable widgets
+- Configure base paths
+- Environment filtering
+
+</div>
+
+<div v-click="2" class="p-6 bg-blue-500/10 rounded-lg">
+
+### 2️⃣ MCP Endpoint
+**`/mcp` route**
+
+- Handles JSON-RPC requests
+- Loads enabled widgets
+- Routes tool calls
+- Returns responses
+
+</div>
+
+<div v-click="3" class="p-6 bg-green-500/10 rounded-lg">
+
+### 3️⃣ Preview Pages
+**`/widgets/*` pages**
+
+- Standalone widget views
+- Testing during development
+- No MCP protocol needed
+- Visual verification
+
+</div>
+
+</div>
+
+<div v-click="4" class="mt-8 text-center text-lg">
+<strong>Plus:</strong> Helper utilities (types, metadata creators, widget loader)
+</div>
+
+---
+
 # MCP Server: Widget Registry
 
 Central configuration for all widgets
-
+<style>
+pre, code, .shiki {
+  font-size: 0.55rem !important;
+  line-height: 1.2 !important;
+}
+</style>
 ```typescript {all|1-9|11-22}
 // mcp.config.ts
 import { headphonesWidgetPackage } from "headphones-widget";
@@ -707,7 +760,12 @@ export default config;
 ---
 
 # MCP Server: The Endpoint
-
+<style>
+pre, code, .shiki {
+  font-size: 0.55rem !important;
+  line-height: 1.2 !important;
+}
+</style>
 ```typescript {all|1-20|22-28}
 // src/app/mcp/route.ts
 import { createMcpHandler } from "mcp-handler";
