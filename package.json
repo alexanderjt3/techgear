@@ -14,7 +14,10 @@
         "build:widget": "npm run build --workspace=packages/widgets/headphones-widget",
         "build:mcp": "npm run build --workspace=packages/mcp",
         "build": "npm run build:widget && npm run build:mcp",
-        "inspector": "npm run inspector --workspace=packages/playground"
+        "inspector": "npm run inspector --workspace=packages/playground",
+        "slides": "cd docs && npm run dev",
+        "slides:build": "cd docs && npm run build",
+        "slides:export": "cd docs && npm run export"
     }
 }
 

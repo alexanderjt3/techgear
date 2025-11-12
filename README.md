@@ -90,6 +90,27 @@ npm run inspector
 
 This launches MCPJam Inspector. Follow the [playground README](./packages/playground/README.md) for detailed testing instructions.
 
+## 📊 Interactive Presentation
+
+Learn how to build ChatGPT apps with our comprehensive Slidev presentation!
+
+```bash
+# From the project root
+npm run slides
+```
+
+The presentation covers:
+- 🎯 What ChatGPT apps are and how they work
+- 🏗️ MCP fundamentals and architecture
+- 🎨 Step-by-step widget development
+- ⚙️ Critical configurations explained
+- 🧪 Three-stage testing strategy
+- 🚀 Best practices and scaling
+
+**40+ slides** with interactive code examples, diagrams, and animations.
+
+See [docs/PRESENTATION_GUIDE.md](./docs/PRESENTATION_GUIDE.md) for more details.
+
 ## 🏗️ Architecture Overview
 
 ### How It Works
@@ -297,7 +318,14 @@ This separation allows widgets to be:
 
 ## 📖 Learn More
 
-### Documentation
+### Project Documentation
+
+- 📚 [**Developer Guide**](./DEVELOPER_GUIDE.md) - Comprehensive 2800+ line guide covering every aspect of building ChatGPT apps
+- 📊 [**Interactive Presentation**](./docs/PRESENTATION_GUIDE.md) - 40+ slide visual guide (run with `npm run slides`)
+- 🚀 [**Getting Started Guide**](./GETTING_STARTED.md) - Step-by-step beginner-friendly tutorial
+- ⚡ [**Quick Reference**](./docs/QUICK_REFERENCE.md) - Command cheat sheet
+
+### External Documentation
 
 - [MCPJam Documentation](https://docs.mcpjam.com/mcp)
 - [OpenAI Apps SDK](https://developers.openai.com/apps-sdk/build/mcp-server)
