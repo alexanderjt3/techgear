@@ -39,9 +39,7 @@ layout: center
 
 </v-clicks>
 
-<div v-after class="mt-8 text-center">
-  <img src="https://images.unsplash.com/photo-1677442136019-21780ecad995?w=600" class="mx-auto rounded-lg shadow-lg" />
-</div>
+
 
 ---
 
@@ -62,7 +60,7 @@ layout: center
 <div v-click>
 
 ## ChatGPT Apps
-- User → ChatGPT → **MCP Server**
+- User → ChatGPT → **Tool Server (MCP)**
 - Natural language intent
 - AI decides when to call tools
 - Dynamic, conversational flow
@@ -73,6 +71,10 @@ layout: center
 
 <div v-click class="mt-8 p-4 bg-blue-500/10 rounded-lg">
 <strong>Key Difference:</strong> ChatGPT acts as an intelligent middleware that interprets user intent and calls your tools at the right time.
+</div>
+
+<div v-click class="mt-4 p-4 bg-purple-500/10 rounded-lg">
+<strong>MCP (Model Context Protocol):</strong> The communication protocol that enables ChatGPT to discover and invoke your tools. Your server implements this protocol to expose functionality to AI assistants.
 </div>
 
 ---
@@ -102,23 +104,22 @@ ChatGPT apps are built on **tools** - functions that ChatGPT can call
 ```
 
 ---
-layout: two-cols
----
+
 
 # How It Works
 
-```mermaid
+```mermaid {scale: 0.6}
 sequenceDiagram
     participant User
     participant ChatGPT
-    participant MCP Server
+    participant Tool Server (MCP)
     participant Widget
     
     User->>ChatGPT: "Show budget headphones"
     ChatGPT->>ChatGPT: Analyze intent
-    ChatGPT->>MCP Server: call find_headphones(budget)
-    MCP Server->>MCP Server: Filter data
-    MCP Server->>ChatGPT: Return results + HTML
+    ChatGPT->>Tool Server (MCP): call find_headphones(budget)
+    Tool Server (MCP)->>Tool Server (MCP): Filter data
+    Tool Server (MCP)->>ChatGPT: Return results + HTML
     ChatGPT->>Widget: Load widget in iframe
     ChatGPT->>Widget: Inject data
     Widget->>User: Display interactive UI
@@ -134,11 +135,19 @@ class: text-center
 
 ## An Electronics Shopping Assistant
 
-<div class="mt-1">
+<div class="mt-16 mb-20">
+  <div class="inline-block px-8 py-6 bg-blue-50 dark:bg-blue-900/20 rounded-xl border-2 border-blue-300 dark:border-blue-700">
+    <div class="text-3xl font-bold text-blue-700 dark:text-blue-300">
+      "Show me budget headphones for gaming"
+    </div>
+  </div>
 </div>
 
-<div class="mt-4 text-xl">
-  "Show me budget headphones for gaming"
+<div class="inline-block px-6 py-3 bg-gray-800 dark:bg-gray-700 rounded-lg hover:bg-gray-700 dark:hover:bg-gray-600 transition-colors">
+  <a href="https://github.com/alexanderjt3/techgear" target="_blank" class="text-white no-underline flex items-center gap-2">
+    <carbon:logo-github class="text-2xl"/> 
+    <span class="text-lg font-semibold">github.com/alexanderjt3/techgear</span>
+  </a>
 </div>
 
 ---
@@ -149,7 +158,7 @@ class: text-center
 
 <div v-click="1" class="p-4 bg-purple-500/10 rounded-lg">
 
-### 🖥️ MCP Server
+### 🖥️ Tool Server (MCP)
 - Next.js application
 - Exposes `/mcp` endpoint
 - Handles JSON-RPC protocol
@@ -180,14 +189,14 @@ class: text-center
 </div>
 
 <div v-click="4" class="mt-8 text-center text-lg">
-<strong>Tech Stack:</strong> Next.js + React + TypeScript + Zod + MCP SDK
+<strong>Tech Stack:</strong> Next.js + React + TypeScript + Zod + MCP SDK (protocol implementation)
 </div>
 
 ---
 
 # Architecture Overview
 
-```mermaid
+```mermaid {scale: 0.7}
 graph TB
     subgraph "ChatGPT Environment"
         A[User Query]
@@ -196,9 +205,9 @@ graph TB
     end
     
     subgraph "Your Infrastructure"
-        D[MCP Server<br/>Next.js]
-        E[Widget Package<br/>React Component]
-        F[Business Logic<br/>Data Filtering]
+        D["Tool Server (MCP)<br/>Next.js"]
+        E["Widget Package<br/>React Component"]
+        F["Business Logic<br/>Data Filtering"]
     end
     
     A --> B
@@ -228,7 +237,7 @@ pre, code, .shiki {
 ```
 techgear/
 ├── packages/
-│   ├── mcp/                          # Next.js MCP Server
+│   ├── mcp/                          # Next.js Tool Server (MCP)
 │   │   ├── src/
 │   │   │   ├── app/
 │   │   │   │   ├── mcp/route.ts      # MCP endpoint
@@ -271,11 +280,26 @@ class: text-center
 ## Let's Break It Down
 
 <div class="mt-12 grid grid-cols-5 gap-4">
-  <div v-click="1" class="p-4 bg-blue-500/20 rounded">1️⃣ Data</div>
-  <div v-click="2" class="p-4 bg-purple-500/20 rounded">2️⃣ Schemas</div>
-  <div v-click="3" class="p-4 bg-green-500/20 rounded">3️⃣ UI</div>
-  <div v-click="4" class="p-4 bg-yellow-500/20 rounded">4️⃣ Integration</div>
-  <div v-click="5" class="p-4 bg-red-500/20 rounded">5️⃣ Registration</div>
+  <div v-click="1" class="p-4 bg-blue-500/20 rounded">
+    <div class="font-bold">1️⃣ Data</div>
+    <div class="text-sm mt-1">`src/data/*`</div>
+  </div>
+  <div v-click="2" class="p-4 bg-purple-500/20 rounded">
+    <div class="font-bold">2️⃣ Schemas</div>
+    <div class="text-sm mt-1">`src/semantic/*`</div>
+  </div>
+  <div v-click="3" class="p-4 bg-green-500/20 rounded">
+    <div class="font-bold">3️⃣ UI</div>
+    <div class="text-sm mt-1">`src/components/*`</div>
+  </div>
+  <div v-click="4" class="p-4 bg-yellow-500/20 rounded">
+    <div class="font-bold">4️⃣ Integration</div>
+    <div class="text-sm mt-1">`src/hooks/*`</div>
+  </div>
+  <div v-click="5" class="p-4 bg-red-500/20 rounded">
+    <div class="font-bold">5️⃣ Registration</div>
+    <div class="text-sm mt-1">`src/register.ts`</div>
+  </div>
 </div>
 
 ---
@@ -495,7 +519,7 @@ Filters: priceBracket (budget/midrange/premium), activity (commuting/gaming/stud
 
 # Step 6a: MCP Registration - Resource
 
-Register the HTML template with the MCP server
+Register the HTML template with the tool server (MCP)
 
 <style>
 pre, code, .shiki {
@@ -592,7 +616,7 @@ async function registerWidget(context: WidgetContext): Promise<void> {
 ```mermaid
 graph LR
     A[Widget Package] -->|Import| B[MCP Config]
-    B -->|loadWidgets| C[MCP Server]
+    B -->|loadWidgets| C[Tool Server (MCP)]
     C -->|registerWidget| D[Register Resource]
     D --> E[HTML Template]
     C -->|registerWidget| F[Register Tool]
@@ -658,7 +682,7 @@ layout: center
 class: text-center
 ---
 
-# MCP Server Setup
+# Tool Server Setup
 
 ## Bringing It All Together
 
@@ -668,7 +692,7 @@ class: text-center
 
 ---
 
-# MCP Server Components
+# Tool Server Components
 
 Building the Next.js server that hosts your MCP endpoint
 
@@ -677,42 +701,48 @@ Building the Next.js server that hosts your MCP endpoint
 <div v-click="1" class="p-4 bg-blue-500/10 rounded-lg border-2 border-blue-500/30">
 
 ### 1️⃣ MCP.config
-Widget registry
+Widget registry  
+`mcp.config.ts`
 
 </div>
 
 <div v-click="2" class="p-4 bg-purple-500/10 rounded-lg border-2 border-purple-500/30">
 
 ### 2️⃣ Endpoint
-HTTP route handler
+HTTP route handler  
+`src/app/mcp/route.ts`
 
 </div>
 
 <div v-click="3" class="p-4 bg-green-500/10 rounded-lg border-2 border-green-500/30">
 
 ### 3️⃣ Tooling
-Helpers & Load Widgets
+Helpers & Load Widgets  
+`src/lib/*`
 
 </div>
 
 <div v-click="4" class="p-4 bg-yellow-500/10 rounded-lg border-2 border-yellow-500/30">
 
 ### 4️⃣ Next.js Config
-**Critical:** Asset prefix
+**Critical:** Asset prefix  
+`next.config.ts`
 
 </div>
 
 <div v-click="5" class="p-4 bg-red-500/10 rounded-lg border-2 border-red-500/30">
 
 ### 5️⃣ HomePage
-Server info & links
+Server info & links  
+`src/app/page.tsx`
 
 </div>
 
 <div v-click="6" class="p-4 bg-indigo-500/10 rounded-lg border-2 border-indigo-500/30">
 
 ### 6️⃣ Widget Page
-Preview & testing
+Preview & testing  
+`src/app/widgets/*/page.tsx`
 
 </div>
 
@@ -802,7 +832,7 @@ export const POST = handler;
 
 # 3️⃣ Tooling - Helpers & Load Widgets
 
-Utilities that power the MCP server
+Utilities that power the tool server (MCP)
 
 <div class="grid grid-cols-2 gap-6 mt-8">
 
@@ -940,8 +970,8 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50">
       <div className="max-w-4xl mx-auto p-8">
-        <h1 className="text-4xl font-bold">TechGear MCP Server</h1>
-        <p className="text-xl mt-4">ChatGPT App Development</p>
+        <h1 className="text-4xl font-bold">TechGear Tool Server</h1>
+        <p className="text-xl mt-4">ChatGPT App Development (using MCP)</p>
         
         <div className="mt-8 space-y-4">
           <h2 className="text-2xl font-semibold">Available Widgets</h2>
@@ -1078,7 +1108,7 @@ The `loadWidgets()` function reads this config and calls each widget's `register
 
 <div class="mt-8 text-center">
 
-## The MCP Server Does 3 Things:
+## The Tool Server Does 3 Things:
 
 <div class="grid grid-cols-3 gap-8 mt-12">
 
@@ -1138,7 +1168,7 @@ class: text-center
 <div v-click>
 
 ### Why MCPJam Inspector?
-- 🔌 Connects to local MCP server
+- 🔌 Connects to local tool server (MCP)
 - 💬 Chat interface for testing
 - 🔍 JSON-RPC message debugger
 - 🎨 Widget preview
@@ -1150,7 +1180,7 @@ class: text-center
 <div v-click>
 
 ### Testing Workflow
-1. Start MCP server locally
+1. Start tool server locally (MCP)
 2. Launch MCPJam Inspector
 3. Connect to your server
 4. Test with natural language
@@ -1200,7 +1230,7 @@ pre, code, .shiki {
 ### 2. Launch Both
 
 ```bash
-# Terminal 1: MCP server
+# Terminal 1: Tool server (MCP)
 cd packages/mcp
 npm run dev
 
@@ -1368,7 +1398,7 @@ Verify everything works before deploying
 
 <div v-click class="mt-8 p-6 bg-green-500/10 rounded-lg border-2 border-green-500/30 text-center">
 
-### 🎉 All checks pass? Your MCP server is ready for ChatGPT!
+### 🎉 All checks pass? Your tool server is ready for ChatGPT!
 
 </div>
 
@@ -1393,7 +1423,7 @@ MCP registration
 
 <div v-click="2" class="p-6 bg-purple-500/20 rounded-lg">
 
-### MCP Server
+### Tool Server (MCP)
 Widget registry  
 Dynamic loading  
 JSON-RPC endpoint  
@@ -1514,7 +1544,7 @@ You now know how to build ChatGPT apps with MCP
 
 ### What You Built
 ✅ Widget package  
-✅ MCP server  
+✅ Tool server (MCP)  
 ✅ Testing workflow  
 ✅ Production-ready app
 
