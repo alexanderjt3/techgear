@@ -72,6 +72,35 @@ layout: center
 
 
 ---
+layout: center
+---
+
+# What is Model Context Protocol (MCP)?
+
+<v-clicks>
+
+- **A standard way for AI apps to communicate** with external tools and data
+- Think of it as **"USB for AI"** - a universal connector
+- Defines how ChatGPT **discovers** and **calls** your tools
+- Uses **JSON-RPC** - simple request/response messages over HTTP
+- Open protocol created by Anthropic, adopted by OpenAI
+
+</v-clicks>
+
+<div v-click class="mt-8 p-4 bg-blue-500/10 rounded-lg">
+
+**In Practice:** Your server exposes an `/mcp` endpoint, ChatGPT sends tool requests, you send back data + HTML
+
+</div>
+
+<div v-click class="mt-4 text-center text-sm opacity-75">
+<a href="https://spec.modelcontextprotocol.io/" target="_blank" class="text-blue-500 hover:text-blue-600 underline">
+Learn more: MCP Specification
+</a>
+</div>
+
+
+---
 
 
 
@@ -105,7 +134,7 @@ sequenceDiagram
 
 ChatGPT apps are built on **tools** - functions that ChatGPT can call
 
-```typescript {all|1-4|6-10|12-16}
+```typescript 
 // Tool Definition
 {
   name: "find_headphones",
@@ -252,10 +281,11 @@ class: text-center
 
 # Step 1: Data & Logic
 
-Define your data and filtering logic
+Here we structure our product data and create the filtering functions that will power our widget. This is the business logic layer - when ChatGPT calls our tool with filters like "budget" or "gaming", these functions determine what results to return.
+
 <style>
 pre, code, .shiki {
-  font-size: 0.55rem !important;
+  font-size: 0.5rem !important;
   line-height: 1.2 !important;
 }
 </style>
@@ -294,13 +324,15 @@ export function filterHeadphones(
 ---
 
 # Step 2: Zod Schemas
+
+We use Zod to define schemas that serve double duty: they validate incoming data at runtime AND generate TypeScript types at compile time. This means we write the contract once and get both type safety and runtime protection. ChatGPT will use these schemas to understand what parameters it can send to our tool.
+
 <style>
 pre, code, .shiki {
-  font-size: 0.55rem !important;
+  font-size: 0.5rem !important;
   line-height: 1.2 !important;
 }
 </style>
-Runtime validation + TypeScript types from a single source
 
 ```typescript 
 // src/semantic/contracts.ts
@@ -339,10 +371,11 @@ export type Headphone = z.infer<typeof HeadphoneContract>;
 
 # Step 3: ChatGPT Integration
 
-The critical hook that receives data from ChatGPT
+When ChatGPT executes our tool, it injects the results into `window.openai.toolOutput`. We use React's `useSyncExternalStore` to listen for changes - when ChatGPT updates this value, our widget automatically re-renders with the new data. This also provides information like dark mode or window size.
+
 <style>
 pre, code, .shiki {
-  font-size: 0.55rem !important;
+  font-size: 0.5rem !important;
   line-height: 1.2 !important;
 }
 </style>
@@ -383,10 +416,11 @@ export function useWidgetProps<T>(defaultState?: T): T | null {
 
 # Step 4: React Component
 
-Build the UI that renders in ChatGPT
+Now we build the actual UI that users see inside ChatGPT. Our component uses the `useWidgetProps` hook to receive filtered data from our tool.
+
 <style>
 pre, code, .shiki {
-  font-size: 0.55rem !important;
+  font-size: 0.5rem !important;
   line-height: 1.2 !important;
 }
 </style>
@@ -427,10 +461,11 @@ export function HeadphonesWidget({ fallbackData }: HeadphonesWidgetProps) {
 
 # Step 5: AI-Facing Descriptions
 
-Teach ChatGPT when and how to use your tool
+These prompts are how you "teach" ChatGPT about your tool.  ChatGPT reads these to decide when your tool is relevant and what parameters to pass. Think of this as writing documentation for an the LLM
+
 <style>
 pre, code, .shiki {
-  font-size: 0.55rem !important;
+  font-size: 0.5rem !important;
   line-height: 1.2 !important;
 }
 </style>
@@ -465,11 +500,11 @@ Filters: priceBracket (budget/midrange/premium), activity (commuting/gaming/stud
 
 # Step 6a: MCP Registration - Resource
 
-Register the HTML template with the tool server (MCP)
+Here we register our widget's HTML with the MCP server as a "resource". We fetch the rendered HTML from our Next.js page and wrap it in a special MIME type (`text/html+skybridge`) that tells ChatGPT "this is a widget template". The metadata describes what the widget does and how it should be displayed.
 
 <style>
 pre, code, .shiki {
-  font-size: 0.55rem !important;
+  font-size: 0.5rem !important;
   line-height: 1.2 !important;
 }
 </style>
@@ -514,11 +549,11 @@ async function registerWidget(context: WidgetContext): Promise<void> {
 
 # Step 6b: MCP Registration - Tool
 
-Register the tool that ChatGPT can call
+This is where we connect everything together! We register a tool that ChatGPT can call, linking it to our widget template via metadata. When called, the tool runs our filtering logic and returns data in `structuredContent` - which ChatGPT injects into the widget as `window.openai.toolOutput`. That's the full circle!
 
 <style>
 pre, code, .shiki {
-  font-size: 0.55rem !important;
+  font-size: 0.5rem !important;
   line-height: 1.2 !important;
 }
 </style>
@@ -555,23 +590,7 @@ async function registerWidget(context: WidgetContext): Promise<void> {
 <strong>Key:</strong> The <code>_meta</code> field links the tool to the widget template. The <code>structuredContent</code> becomes <code>window.openai.toolOutput</code>.
 </div>
 
----
 
-# Then Build It!
-
-
-
-<div class="mt-20">
-
-
-```bash
-cd packages/widgets/headphones-widget
-npm run build
-```
-
-This compiles TypeScript → JavaScript in `dist/` folder
-
-</div>
 
 ---
 layout: center
@@ -648,11 +667,11 @@ React App
 
 # 1️⃣ MCP.config - Widget Registry
 
-Central configuration for all widgets
+This is your widget inventory - a simple config file that lists all available widgets and their settings. Each entry imports a widget package and specifies where it lives (`basePath`), whether it's enabled, and if it's production-ready. The server reads this file at startup to know which widgets to load.
 
 <style>
 pre, code, .shiki {
-  font-size: 0.55rem !important;
+  font-size: 0.5rem !important;
   line-height: 1.3 !important;
 }
 </style>
@@ -690,11 +709,11 @@ export default config;
 
 # 2️⃣ Endpoint - MCP Route Handler
 
-HTTP route handling JSON-RPC requests
+This is an HTTP endpoint at `/mcp` that speaks JSON-RPC. ChatGPT sends requests here to discover tools and call them. We set up a context with logging and an HTML fetcher, then pass it to `loadWidgets()` which registers everything. Both GET and POST are supported for flexibility.
 
 <style>
 pre, code, .shiki {
-  font-size: 0.55rem !important;
+  font-size: 0.5rem !important;
   line-height: 1.3 !important;
 }
 </style>
@@ -728,7 +747,7 @@ export const POST = handler;
 
 # 3️⃣ Tooling - Helpers & Load Widgets
 
-Utilities that power the tool server (MCP)
+These utilities handle the repetitive work of MCP registration. The metadata helpers create properly formatted `_meta` objects that ChatGPT expects - they add OpenAI-specific fields like widget descriptions and template URIs. The widget loader iterates through enabled widgets in your config and calls each one's `registerWidget()` function.
 
 <div class="grid grid-cols-2 gap-6 mt-8">
 
@@ -738,7 +757,7 @@ Utilities that power the tool server (MCP)
 
 <style>
 pre, code, .shiki {
-  font-size: 0.5rem !important;
+  font-size: 0.48rem !important;
   line-height: 1.2 !important;
 }
 </style>
@@ -771,7 +790,7 @@ export function createWidgetMeta(
 
 </div>
 
-<div v-click>
+<div>
 
 ### Widget Loader
 
@@ -810,11 +829,11 @@ export async function loadWidgets(
 
 # 4️⃣ Next.js Config - Critical Setup
 
-⚡ **CRITICAL** for widget rendering in ChatGPT
+This config solves a crucial problem: when ChatGPT loads your widget in an iframe, the HTML tries to load JavaScript from relative paths. Without `assetPrefix`, those scripts try to load from `chatgpt.com` instead of your server - resulting in blank pages! We set absolute URLs in development so all assets point back to your localhost.
 
 <style>
 pre, code, .shiki {
-  font-size: 0.55rem !important;
+  font-size: 0.5rem !important;
   line-height: 1.3 !important;
 }
 </style>
@@ -849,11 +868,11 @@ export default nextConfig;
 
 # 5️⃣ HomePage - Server Info
 
-Landing page with server information
+This is your server's front door - a simple landing page that shows what's available. It lists your widgets with links to preview pages, displays the MCP endpoint URL, and provides helpful information for developers. It's not required for functionality, but makes your server much more user-friendly to explore.
 
 <style>
 pre, code, .shiki {
-  font-size: 0.6rem !important;
+  font-size: 0.55rem !important;
   line-height: 1.4 !important;
 }
 </style>
@@ -890,11 +909,11 @@ export default function HomePage() {
 
 # 6️⃣ Widget Page
 
-React Application
+This Next.js page renders your widget for preview and testing. It's incredibly simple - just import your widget component and render it! When you visit `/widgets/headphones` in your browser, you see exactly what will appear in ChatGPT. This lets you iterate on styling and UI without going through the full MCP flow.
 
 <style>
 pre, code, .shiki {
-  font-size: 0.6rem !important;
+  font-size: 0.55rem !important;
   line-height: 1.4 !important;
 }
 </style>
@@ -1112,7 +1131,7 @@ pre, code, .shiki {
 
 </div>
 
-<div v-click>
+<div >
 
 ### 2. Launch Both
 
@@ -1245,49 +1264,7 @@ window.openai?.toolOutput
 
 </div>
 
----
 
-# Success Checklist
-
-Verify everything works before deploying
-
-<div class="mt-8 grid grid-cols-2 gap-6">
-
-<div>
-
-### ✅ Server Connection
-- Green checkmark on connect
-- Tools listed correctly
-- Resources discovered
-
-### ✅ Widget Rendering
-- HTML loads in iframe
-- Tailwind CSS applied
-- No console errors
-
-</div>
-
-<div v-click>
-
-### ✅ Data Flow
-- Tool receives correct params
-- `structuredContent` present
-- Widget shows filtered data
-
-### ✅ Protocol
-- Valid JSON-RPC messages
-- Correct MIME types
-- Metadata complete
-
-</div>
-
-</div>
-
-<div v-click class="mt-8 p-6 bg-green-500/10 rounded-lg border-2 border-green-500/30 text-center">
-
-### 🎉 All checks pass? Your tool server is ready for ChatGPT!
-
-</div>
 
 ---
 layout: center
@@ -1330,45 +1307,9 @@ Production ready
 
 </div>
 
----
 
-# Critical Configurations
 
-The 5 must-have settings for widgets
 
-<div class="mt-8 grid grid-cols-1 gap-4">
-
-<div v-click class="p-4 bg-red-500/10 rounded-lg border-l-4 border-red-500">
-
-**1. Asset Prefix** → `assetPrefix: getAssetPrefix()` in next.config.ts
-
-</div>
-
-<div v-click class="p-4 bg-orange-500/10 rounded-lg border-l-4 border-orange-500">
-
-**2. Event-Driven Hook** → `useSyncExternalStore` not polling
-
-</div>
-
-<div v-click class="p-4 bg-yellow-500/10 rounded-lg border-l-4 border-yellow-500">
-
-**3. MIME Type** → `text/html+skybridge` not `text/html`
-
-</div>
-
-<div v-click class="p-4 bg-green-500/10 rounded-lg border-l-4 border-green-500">
-
-**4. Complete Metadata** → `_meta` in resource, tool, response
-
-</div>
-
-<div v-click class="p-4 bg-blue-500/10 rounded-lg border-l-4 border-blue-500">
-
-**5. Response Format** → `structuredContent` at root level
-
-</div>
-
-</div>
 
 ---
 
@@ -1382,15 +1323,14 @@ Your path to building ChatGPT apps
 
 ### Getting Started
 
-<v-clicks>
+
 
 1. 📥 Clone the TechGear repo
 2. 📖 Read DEVELOPER_GUIDE.md
 3. 🏗️ Build your first widget
 4. 🧪 Test with MCPJam
-5. 🚀 Deploy to ChatGPT
 
-</v-clicks>
+
 
 </div>
 
@@ -1406,54 +1346,13 @@ Your path to building ChatGPT apps
 **TechGear Files**
 - `DEVELOPER_GUIDE.md`
 - `QUICK_REFERENCE.md`
-- `SLIDES_CHEATSHEET.md`
+
 
 </div>
 
 </div>
 
----
-layout: center
-class: text-center
----
 
-# 🚀 You're Ready!
-
-<div class="mt-12 text-2xl">
-
-You now know how to build ChatGPT apps with MCP
-
-</div>
-
-<div class="mt-12 grid grid-cols-2 gap-8 max-w-4xl mx-auto">
-
-<div v-click class="p-6 bg-blue-500/20 rounded-lg">
-
-### What You Built
-✅ Widget package  
-✅ Tool server (MCP)  
-✅ Testing workflow  
-✅ Production-ready app
-
-</div>
-
-<div v-click class="p-6 bg-purple-500/20 rounded-lg">
-
-### What You Learned
-✅ MCP protocol  
-✅ Event-driven hooks  
-✅ Dynamic loading  
-✅ Critical configs
-
-</div>
-
-</div>
-
-<div v-click class="mt-12 text-3xl font-bold">
-
-**Go build something amazing!** 🎉
-
-</div>
 
 ---
 layout: end
@@ -1465,7 +1364,7 @@ layout: end
 
 <div class="mt-12 text-xl opacity-75">
 
-Questions? Check `DEVELOPER_GUIDE.md`
+Questions....? --> Check DEVELOPER_GUIDE.md
 
 </div>
 
