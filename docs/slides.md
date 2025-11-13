@@ -16,115 +16,13 @@ mdc: true
 
 # Building ChatGPT Apps with MCP
 
-An Educational Guide to the Model Context Protocol
+
 
 <div class="pt-12">
   <span @click="$slidev.nav.next" class="px-2 py-1 rounded cursor-pointer" hover="bg-white bg-opacity-10">
-    Press Space for next page <carbon:arrow-right class="inline"/>
+   
   </span>
 </div>
-
----
-layout: center
----
-
-# What is a ChatGPT App?
-
-<v-clicks>
-
-- Interactive widgets that appear **inside** ChatGPT conversations
-- Responds to natural language queries
-- Renders rich UI (carousels, cards, charts, etc.)
-- Combines AI understanding with custom business logic
-
-</v-clicks>
-
-
-
----
-
-# What Really is a ChatGPT App?
-
-<div class="grid grid-cols-2 gap-8">
-
-<div>
-
-## Traditional Apps
-- User → UI → Backend
-- Direct HTTP requests
-- Explicit button clicks
-- Fixed navigation paths
-
-</div>
-
-<div v-click>
-
-## ChatGPT Apps
-- User → ChatGPT → **Tool Server (MCP)**
-- Natural language intent
-- AI decides when to call tools
-- Dynamic, conversational flow
-
-</div>
-
-</div>
-
-<div v-click class="mt-8 p-4 bg-blue-500/10 rounded-lg">
-<strong>Key Difference:</strong> ChatGPT acts as an intelligent middleware that interprets user intent and calls your tools at the right time.
-</div>
-
-<div v-click class="mt-4 p-4 bg-purple-500/10 rounded-lg">
-<strong>MCP (Model Context Protocol):</strong> The communication protocol that enables ChatGPT to discover and invoke your tools. Your server implements this protocol to expose functionality to AI assistants.
-</div>
-
----
-
-# Tool Structure
-
-ChatGPT apps are built on **tools** - functions that ChatGPT can call
-
-```typescript {all|1-4|6-10|12-16}
-// Tool Definition
-{
-  name: "find_headphones",
-  description: "Find headphones based on filters",
-  
-  // Input schema (what ChatGPT sends)
-  inputSchema: {
-    priceBracket: "budget" | "midrange" | "premium",
-    activity: "commuting" | "gaming" | "studio" | "fitness"
-  },
-  
-  // Tool execution (your business logic)
-  handler: async (input) => {
-    const results = filterHeadphones(input);
-    return { headphones: results };
-  }
-}
-```
-
----
-
-
-# How It Works
-
-```mermaid {scale: 0.6}
-sequenceDiagram
-    participant User
-    participant ChatGPT
-    participant ToolServer as Tool Server (MCP)
-    participant Widget
-    
-    User->>ChatGPT: "Show budget headphones"
-    ChatGPT->>ChatGPT: Analyze intent
-    ChatGPT->>ToolServer: call find_headphones(budget)
-    ToolServer->>ToolServer: Filter data
-    ToolServer->>ChatGPT: Return results + HTML
-    ChatGPT->>Widget: Load widget in iframe
-    ChatGPT->>Widget: Inject data
-    Widget->>User: Display interactive UI
-```
-
 
 ---
 layout: center
@@ -149,6 +47,83 @@ class: text-center
     <span class="text-lg font-semibold">github.com/alexanderjt3/techgear</span>
   </a>
 </div>
+
+
+---
+layout: center
+---
+
+# What is a ChatGPT App?
+
+<v-clicks>
+
+- Interactive widgets that appear **inside** ChatGPT conversations
+- Responds to natural language queries
+- Renders rich UI (carousels, cards, charts, etc.)
+- Combines AI understanding with custom business logic
+
+</v-clicks>
+
+<div class="mt-8 text-center">
+  <a href="https://openai.com/index/introducing-apps-in-chatgpt/?video=1124696991" target="_blank" class="text-blue-500 hover:text-blue-600 underline">
+    Learn more: Introducing Apps in ChatGPT
+  </a>
+</div>
+
+
+---
+
+
+
+
+# How It Works
+
+```mermaid {scale: 0.6}
+sequenceDiagram
+    participant User
+    participant ChatGPT
+    participant ToolServer as Tool Server (MCP)
+    participant Widget
+    
+    User->>ChatGPT: "Show budget headphones"
+    ChatGPT->>ChatGPT: Analyze intent
+    ChatGPT->>ToolServer: call find_headphones(budget)
+    ToolServer->>ToolServer: Filter data
+    ToolServer->>ChatGPT: Return results + HTML
+    ChatGPT->>Widget: Load widget in iframe
+    ChatGPT->>Widget: Inject data
+    Widget->>User: Display interactive UI
+```
+
+
+
+
+---
+
+
+# Tool Structure
+
+ChatGPT apps are built on **tools** - functions that ChatGPT can call
+
+```typescript {all|1-4|6-10|12-16}
+// Tool Definition
+{
+  name: "find_headphones",
+  description: "Find headphones based on filters",
+  
+  // Input schema (what ChatGPT sends)
+  inputSchema: {
+    priceBracket: "budget" | "midrange" | "premium",
+    activity: "commuting" | "gaming" | "studio" | "fitness"
+  },
+  
+  // Tool execution (your business logic)
+  handler: async (input) => {
+    const results = filterHeadphones(input);
+    return { headphones: results };
+  }
+}
+```
 
 ---
 
@@ -194,36 +169,7 @@ class: text-center
 
 ---
 
-# Architecture Overview
 
-```mermaid {scale: 0.7}
-graph TB
-    subgraph "ChatGPT Environment"
-        A[User Query]
-        B[ChatGPT AI]
-        C[Widget Iframe]
-    end
-    
-    subgraph "Your Infrastructure"
-        D["Tool Server (MCP)<br/>Next.js"]
-        E["Widget Package<br/>React Component"]
-        F["Business Logic<br/>Data Filtering"]
-    end
-    
-    A --> B
-    B -->|JSON-RPC| D
-    D --> F
-    F --> D
-    D -->|HTML + Data| B
-    B --> C
-    C -->|Renders| E
-    
-    style D fill:#9333ea
-    style E fill:#3b82f6
-    style F fill:#10b981
-```
-
----
 
 # Project Layout
 
@@ -313,7 +259,7 @@ pre, code, .shiki {
   line-height: 1.2 !important;
 }
 </style>
-```typescript {all|1-12|14-28}
+```typescript 
 // src/data/headphones.ts
 export const HEADPHONES: Headphone[] = [
   {
@@ -356,7 +302,7 @@ pre, code, .shiki {
 </style>
 Runtime validation + TypeScript types from a single source
 
-```typescript {all|1-10|12-20|22-24}
+```typescript 
 // src/semantic/contracts.ts
 import z from "zod";
 
@@ -383,7 +329,7 @@ export type FindHeadphonesToolInput = z.infer<typeof FindHeadphonesToolInputCont
 export type Headphone = z.infer<typeof HeadphoneContract>;
 ```
 
-<div v-click class="mt-4 p-3 bg-yellow-500/10 rounded">
+<div class="mt-4 p-3 bg-yellow-500/10 rounded">
 <strong>Why Zod?</strong> Single schema provides both compile-time types AND runtime validation!
 </div>
 
@@ -400,7 +346,7 @@ pre, code, .shiki {
   line-height: 1.2 !important;
 }
 </style>
-```typescript {all|1-5|7-21|23-30}
+```typescript 
 // src/hooks/useOpenAI.ts
 import { useSyncExternalStore } from "react";
 
@@ -444,7 +390,7 @@ pre, code, .shiki {
   line-height: 1.2 !important;
 }
 </style>
-```typescript {all|1-8|10-16|18-30}
+```typescript
 // src/components/HeadphonesWidget.tsx
 "use client";
 import { useWidgetProps } from "../hooks/useOpenAI";
@@ -488,7 +434,7 @@ pre, code, .shiki {
   line-height: 1.2 !important;
 }
 </style>
-```typescript {all|1-15|17-20}
+```typescript 
 // src/semantic/prompts.ts
 export const headphonesWidgetPrompts = {
   toolTitle: "Find Headphones",
@@ -511,7 +457,7 @@ Filters: priceBracket (budget/midrange/premium), activity (commuting/gaming/stud
 };
 ```
 
-<div v-click class="mt-4 p-3 bg-blue-500/10 rounded">
+<div  class="mt-4 p-3 bg-blue-500/10 rounded">
 <strong>Pro Tip:</strong> Be explicit, provide examples, use natural language. ChatGPT learns from these descriptions!
 </div>
 
@@ -528,7 +474,7 @@ pre, code, .shiki {
 }
 </style>
 
-```typescript {all|1-6|8-25}
+```typescript 
 // src/register.ts
 async function registerWidget(context: WidgetContext): Promise<void> {
   const { server, logger, getHtml, basePath } = context;
@@ -560,7 +506,7 @@ async function registerWidget(context: WidgetContext): Promise<void> {
 }
 ```
 
-<div v-click class="mt-4 p-3 bg-blue-500/10 rounded">
+<div class="mt-4 p-3 bg-blue-500/10 rounded">
 <strong>Key:</strong> The resource registration makes the widget HTML available to ChatGPT. The <code>mimeType</code> must be <code>text/html+skybridge</code>!
 </div>
 
@@ -577,7 +523,7 @@ pre, code, .shiki {
 }
 </style>
 
-```typescript {all|1-10|12-20}
+```typescript 
 // src/register.ts (continued)
 async function registerWidget(context: WidgetContext): Promise<void> {
   // ... resource registration above
@@ -605,68 +551,18 @@ async function registerWidget(context: WidgetContext): Promise<void> {
 }
 ```
 
-<div v-click class="mt-4 p-3 bg-purple-500/10 rounded">
+<div class="mt-4 p-3 bg-purple-500/10 rounded">
 <strong>Key:</strong> The <code>_meta</code> field links the tool to the widget template. The <code>structuredContent</code> becomes <code>window.openai.toolOutput</code>.
 </div>
 
 ---
 
-# Widget Registration Flow
+# Then Build It!
 
-```mermaid
-graph LR
-    A[Widget Package] -->|Import| B[MCP Config]
-    B -->|loadWidgets| C["Tool Server (MCP)"]
-    C -->|registerWidget| D[Register Resource]
-    D --> E[HTML Template]
-    C -->|registerWidget| F[Register Tool]
-    F --> G[Tool Handler]
-    G --> H[Business Logic]
-    H --> I[Return Data + Meta]
-    I --> J[ChatGPT]
-    J --> K[Load HTML]
-    J --> L[Inject Data]
-    K --> M[Widget Renders]
-    L --> M
-    
-    style D fill:#3b82f6
-    style F fill:#9333ea
-    style M fill:#10b981
-```
 
----
 
-# Widget Package Exports
+<div class="mt-20">
 
-Create a clean public API
-<style>
-pre, code, .shiki {
-  font-size: 0.55rem !important;
-  line-height: 1.2 !important;
-}
-</style>
-```typescript
-// src/index.ts - Public exports
-
-// Types
-export * from "./types";
-
-// Configuration
-export * from "./config";
-
-// Registration function
-export * from "./register";
-
-// React component (for preview pages)
-export * from "./components/HeadphonesWidget";
-
-// Hooks (reusable for other widgets)
-export * from "./hooks/useOpenAI";
-```
-
-<div class="mt-8">
-
-## Then Build It!
 
 ```bash
 cd packages/widgets/headphones-widget
@@ -687,7 +583,7 @@ class: text-center
 ## Bringing It All Together
 
 <div class="mt-8 text-6xl">
-🖥️ ↔️ 🎨 ↔️ 🤖
+
 </div>
 
 ---
@@ -741,7 +637,7 @@ Server info & links
 <div v-click="6" class="p-4 bg-indigo-500/10 rounded-lg border-2 border-indigo-500/30">
 
 ### 6️⃣ Widget Page
-Preview & testing  
+React App
 `src/app/widgets/*/page.tsx`
 
 </div>
@@ -761,7 +657,7 @@ pre, code, .shiki {
 }
 </style>
 
-```typescript {all|1|3-10|12-22}
+```typescript 
 // mcp.config.ts
 import { headphonesWidgetPackage } from "headphones-widget";
 
@@ -803,7 +699,7 @@ pre, code, .shiki {
 }
 </style>
 
-```typescript {all|1-3|5-17|19-20}
+```typescript 
 // src/app/mcp/route.ts
 import { createMcpHandler } from "mcp-handler";
 import { loadWidgets } from "@/lib/loadWidgets";
@@ -923,7 +819,7 @@ pre, code, .shiki {
 }
 </style>
 
-```typescript {all|4-11|13-16}
+```typescript 
 // next.config.ts
 import type { NextConfig } from "next";
 
@@ -945,7 +841,7 @@ const nextConfig: NextConfig = {
 export default nextConfig;
 ```
 
-<div v-click class="mt-4 p-4 bg-red-500/10 rounded border-2 border-red-500/30">
+<div  class="mt-4 p-4 bg-red-500/10 rounded border-2 border-red-500/30">
 <strong>Without this:</strong> Blank pages in ChatGPT! Scripts try to load from chatgpt.com instead of your server.
 </div>
 
@@ -992,9 +888,9 @@ export default function HomePage() {
 
 ---
 
-# 6️⃣ Widget Page - Preview & Testing
+# 6️⃣ Widget Page
 
-Test widgets without MCP protocol
+React Application
 
 <style>
 pre, code, .shiki {
@@ -1015,7 +911,7 @@ export default function HeadphonesWidgetPage() {
 
 <div class="mt-8 grid grid-cols-2 gap-6">
 
-<div v-click>
+<div >
 
 ### 🎯 Benefits
 - Fast visual testing
@@ -1025,7 +921,7 @@ export default function HeadphonesWidgetPage() {
 
 </div>
 
-<div v-click>
+<div >
 
 ### 📍 Access
 Visit: `localhost:3000/widgets/headphones`
@@ -1071,7 +967,7 @@ export const headphonesWidgetPackage = {
 
 </div>
 
-<div v-click>
+<div >
 
 ### Server Imports
 
@@ -1096,7 +992,7 @@ const config = {
 
 </div>
 
-<div v-click class="mt-8 p-4 bg-blue-500/10 rounded">
+<div class="mt-8 p-4 bg-blue-500/10 rounded">
 
 The `loadWidgets()` function reads this config and calls each widget's `registerWidget()` method
 
@@ -1112,33 +1008,24 @@ The `loadWidgets()` function reads this config and calls each widget's `register
 
 <div class="grid grid-cols-3 gap-8 mt-12">
 
-<div v-click="1" class="p-8 bg-blue-500/20 rounded-lg">
+<div  class="p-8 bg-blue-500/20 rounded-lg">
 
 ### 1. Import
-```typescript
-import { widget }
-from "headphones-widget"
-```
+
 
 </div>
 
-<div v-click="2" class="p-8 bg-purple-500/20 rounded-lg">
+<div  class="p-8 bg-purple-500/20 rounded-lg">
 
 ### 2. Configure
-```typescript
-widgets: {
-  headphones: { ... }
-}
-```
+
 
 </div>
 
-<div v-click="3" class="p-8 bg-green-500/20 rounded-lg">
+<div  class="p-8 bg-green-500/20 rounded-lg">
 
 ### 3. Load
-```typescript
-await loadWidgets()
-```
+
 
 </div>
 
