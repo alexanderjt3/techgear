@@ -138,7 +138,6 @@ A complete, educational MCP (Model Context Protocol) application for suggesting 
 ### No Framework Lock-in
 
 Unlike the reference project, TechGear has:
-- ❌ No `@ck/ai-apps-framework` dependency
 - ❌ No custom tooling or CLI
 - ❌ No authentication complexity
 - ✅ Pure MCP SDK + standard libraries
@@ -187,19 +186,7 @@ This makes widgets:
 - Maintainable (clear structure)
 - Reusable (npm package)
 
-## Simplified vs Reference Project
 
-| Aspect | Reference Project | TechGear |
-|--------|------------------|----------|
-| Framework | Custom `@ck/ai-apps-framework` | None |
-| Auth | OAuth, sessions, tokens | None |
-| GraphQL | Multiple services | Hardcoded data |
-| CLI Tools | Custom `ck-mcp` CLI | Standard npm |
-| PM2 | Multi-process orchestration | Not needed |
-| Widget Count | 5+ widgets | 1 focused widget |
-| Complexity | Production-grade | Educational |
-| Setup Time | 30+ minutes | 5 minutes |
-| Learning Curve | Steep | Gentle |
 
 ## What Students Learn
 
