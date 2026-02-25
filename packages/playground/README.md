@@ -33,16 +33,11 @@ In this directory, run:
 npm run inspector
 ```
 
-This will launch the MCPJam Inspector in your browser.
+This will launch the MCPJam Inspector in your browser and **automatically connect** to the TechGear MCP server at `http://localhost:3000/mcp`.
 
-### 3. Connect to the Server
+The inspector opens directly to the **Tools** tab, ready for testing.
 
-1. In the Inspector, go to the **Servers** tab
-2. The TechGear server should be automatically detected from `mcp.config.json`
-3. Click **Connect** to connect to the server
-4. Once connected, navigate to the **Playground** tab
-
-### 4. Test the Headphones Widget
+### 3. Test the Headphones Widget
 
 In the playground chat interface, try prompts like:
 

@@ -53,6 +53,52 @@ class: text-center
 layout: center
 ---
 
+# Think of MCP Like Bluetooth
+
+<v-clicks>
+
+- **MCP is like the Bluetooth protocol for AI** - a universal standard for connection
+- Engineers create **hyper-specific functions** that AI agents can interpret
+- Users don't need to call functions directly - just **chat naturally**
+
+</v-clicks>
+
+<div v-click class="mt-8 p-6 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-xl border border-blue-300/30">
+
+### Example: Music Playlist
+
+Imagine a playlist with songs: artists, genres, BPM, release dates...
+
+<div class="mt-4 grid grid-cols-2 gap-4">
+
+<div class="text-left">
+<strong class="text-red-400">❌ Without MCP:</strong>
+<div class="text-sm mt-2 opacity-80">
+User must call:<br/>
+<code class="text-xs">find_music_by_artist("Drake")</code>
+</div>
+</div>
+
+<div class="text-left">
+<strong class="text-green-400">✅ With MCP:</strong>
+<div class="text-sm mt-2 opacity-80">
+User: "Play some Drake"<br/>
+<span class="text-xs opacity-60">AI reviews tools → calls function automatically</span>
+</div>
+</div>
+
+</div>
+
+</div>
+
+<div v-click class="mt-6 text-center text-xl font-semibold text-blue-400">
+This makes MCP incredibly valuable for building intuitive AI experiences
+</div>
+
+---
+layout: center
+---
+
 # What is a ChatGPT App?
 
 <v-clicks>
@@ -371,7 +417,7 @@ export type Headphone = z.infer<typeof HeadphoneContract>;
 
 # Step 3: ChatGPT Integration
 
-When ChatGPT executes our tool, it injects the results into `window.openai.toolOutput`. We use React's `useSyncExternalStore` to listen for changes - when ChatGPT updates this value, our widget automatically re-renders with the new data. This also provides information like dark mode or window size.
+ChatGPT integrates with our app by adding a property to the window: `window.openai.toolOutput`. When ChatGPT executes our tool call and gets results, it injects them into the window. Our app accesses this data and renders based on the results.
 
 <style>
 pre, code, .shiki {
@@ -416,7 +462,7 @@ export function useWidgetProps<T>(defaultState?: T): T | null {
 
 # Step 4: React Component
 
-Now we build the actual UI that users see inside ChatGPT. Our component uses the `useWidgetProps` hook to receive filtered data from our tool.
+Now we build the actual UI that users see inside ChatGPT. Our component uses the `useWidgetProps` hook that we just created to receive filtered data from our tool.
 
 <style>
 pre, code, .shiki {
@@ -494,6 +540,10 @@ Filters: priceBracket (budget/midrange/premium), activity (commuting/gaming/stud
 
 <div  class="mt-4 p-3 bg-blue-500/10 rounded">
 <strong>Pro Tip:</strong> Be explicit, provide examples, use natural language. ChatGPT learns from these descriptions!
+</div>
+
+<div class="mt-3 text-sm opacity-75">
+<strong>So far:</strong> Data / Filters / Structure → ChatGPT hook to read tool results → React UI → AI prompts for interpretation. <strong>Next:</strong> Register Widget / App with Server.
 </div>
 
 ---
