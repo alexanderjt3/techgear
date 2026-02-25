@@ -5,7 +5,7 @@
     "description": "Testing playground for TechGear MCP server",
     "license": "MIT",
     "scripts": {
-        "inspector": "npx @mcpjam/inspector@latest"
+        "inspector": "npx @mcpjam/inspector@latest --url http://localhost:3000/mcp --name \"TechGear\" --tab tools"
     }
 }
 
